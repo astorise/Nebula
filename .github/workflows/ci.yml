@@ -60,7 +60,9 @@ jobs:
           workspaces: faas
 
       - name: Install cargo-component
-        run: cargo install cargo-component --locked
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-component
 
       - name: Check formatting
         run: cargo fmt --all -- --check

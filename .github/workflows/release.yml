@@ -40,8 +40,13 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Install Wasm tooling
-        run: cargo install cargo-component wkg --locked
+      - name: Install cargo-component
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-component
+
+      - name: Install wkg
+        run: cargo install wkg --locked
 
       - name: Build Node packages
         run: npm run build
