@@ -1,24 +1,24 @@
-# Design : Fondation Nebula
+# Design: Nebula Foundation
 
 ## Architecture
 
-Le depot est initialise comme monorepo npm avec deux workspaces :
+The repository is initialized as an npm monorepo with two workspaces:
 
-- `packages/cli` expose le moteur local Nebula.
-- `packages/extension` expose l'interface VS Code.
+- `packages/cli` exposes the local Nebula engine.
+- `packages/extension` exposes the VS Code interface.
 
-Le CLI demarre un serveur HTTPS unique configure en mTLS. Le serveur traite les requetes WebDAV de lecture sur le chemin racine et attache un pont WebSocket sur `/ws`.
+The CLI starts a single mTLS-enabled HTTPS server. The server handles read-only WebDAV requests at the root path and attaches a WebSocket bridge at `/ws`.
 
 ## CLI
 
-Le serveur WebDAV resout toutes les requetes dans `NEBULA_DOCS_ROOT` et refuse toute sortie de ce repertoire. Les methodes autorisees sont `GET`, `HEAD`, `OPTIONS` et `PROPFIND`; les methodes modificatrices retournent `405 Method Not Allowed`.
+The WebDAV server resolves all requests within `NEBULA_DOCS_ROOT` and rejects any path escape from that directory. Allowed methods are `GET`, `HEAD`, `OPTIONS`, and `PROPFIND`; mutating methods return `405 Method Not Allowed`.
 
-Le pont WebSocket utilise `ws` et verifie que le socket TLS client est autorise. Les messages recus sont transmis a un routeur Tachyon stub, qui renvoie un evenement de routage stable en attendant l'IPC Tachyon reel.
+The WebSocket bridge uses `ws` and verifies that the client TLS socket is authorized. Incoming messages are passed to a Tachyon router stub, which returns a stable routing event until the real Tachyon IPC adapter is available.
 
-## Extension VS Code
+## VS Code Extension
 
-L'extension declare la commande `Nebula: Open Dashboard`. Elle ouvre un webview de pilotage et cree un client WebSocket `wss` avec les chemins de certificats declares dans la configuration `nebula.tls.*`.
+The extension declares the `Nebula: Open Dashboard` command. It opens a control webview and creates a `wss` WebSocket client with the certificate paths declared in the `nebula.tls.*` configuration.
 
-## Securite
+## Security
 
-Les certificats serveur, client et CA sont fournis par configuration locale. Le CLI impose `requestCert: true` et `rejectUnauthorized: true`; l'extension impose aussi la validation du serveur via la CA configuree.
+Server, client, and CA certificates are supplied through local configuration. The CLI enforces `requestCert: true` and `rejectUnauthorized: true`; the extension also validates the server through the configured CA.

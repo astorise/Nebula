@@ -1,23 +1,23 @@
-# Design : Pipeline d'evaluation de divergence
+# Design: Divergence Evaluation Pipeline
 
 ## Architecture
 
-Le pipeline est decoupe en quatre crates Rust sous `faas/`, chacune representant une fonction Wasm deployable separement :
+The pipeline is split into four Rust crates under `faas/`, each representing a separately deployable Wasm function:
 
-- `nebula-telemetry-gateway` route les triplets d'inference depuis `tachyon:messaging/event-bus`.
-- `nebula-eval-ast` evalue les generations de code via un hachage structurel.
-- `nebula-eval-semantic` evalue les textes libres via embeddings et similarite cosinus.
-- `nebula-divergence-aggregator` transforme les divergences confirmees en taches Tier 3 persistantes.
+- `nebula-telemetry-gateway` routes inference triplets from `tachyon:messaging/event-bus`.
+- `nebula-eval-ast` evaluates code generations through structural hashing.
+- `nebula-eval-semantic` evaluates free text through embeddings and cosine similarity.
+- `nebula-divergence-aggregator` turns confirmed divergences into persistent Tier 3 tasks.
 
-Les integrations Tachyon sont modelisees par des traits (`EventBus`, `InferenceHost`, `KvListStore`, `GrammarRegistry`) afin que les crates restent compilables et testables hors du runtime Wasm. Le host Tachyon fournira les implementations concretes lors du packaging FaaS.
+Tachyon integrations are modeled as traits (`EventBus`, `InferenceHost`, `KvListStore`, `GrammarRegistry`) so the crates remain compilable and testable outside the Wasm runtime. The Tachyon host supplies concrete implementations during FaaS packaging.
 
-## Flux
+## Flow
 
-1. Le gateway consomme `pulsar.telemetry.inference_triplets`.
-2. Les payloads code sont envoyes vers `nebula.eval.ast.pending`; les payloads texte vers `nebula.eval.semantic.pending`.
-3. Les evaluateurs publient uniquement les divergences confirmees sur `nebula.eval.results`.
-4. L'aggregator filtre `diverged == true` et pousse une tache JSON dans la liste KV `nebula:tier3:arbitration`.
+1. The gateway consumes `pulsar.telemetry.inference_triplets`.
+2. Code payloads are sent to `nebula.eval.ast.pending`; text payloads are sent to `nebula.eval.semantic.pending`.
+3. Evaluators publish only confirmed divergences to `nebula.eval.results`.
+4. The aggregator filters `diverged == true` and pushes a JSON task into the `nebula:tier3:arbitration` KV list.
 
-## Compromis
+## Tradeoffs
 
-Le binding Tree-sitter Wasm est expose comme dependance de registre via `GrammarRegistry`; l'implementation actuelle valide le chargement dynamique et applique un hachage structurel deterministe sur l'arbre produit par `tree-sitter`. Le branchement exact vers les grammaires Wasm du registre Tachyon reste isole derriere ce trait.
+The Tree-sitter Wasm binding is exposed as a registry dependency through `GrammarRegistry`; the current implementation validates dynamic loading and applies deterministic structural hashing. The exact connection to Tachyon registry grammar modules remains isolated behind that trait.

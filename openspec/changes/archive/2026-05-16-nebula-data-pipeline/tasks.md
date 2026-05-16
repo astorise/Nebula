@@ -1,7 +1,7 @@
-# Tâches d'implémentation
+# Implementation Tasks
 
-- [x] `task-1` : Créer l'arborescence des workspaces Rust dans `faas/` (`nebula-telemetry-gateway`, `nebula-eval-ast`, `nebula-eval-semantic`, `nebula-divergence-aggregator`).
-- [x] `task-2` : Implémenter le routeur d'événements `nebula-telemetry-gateway` basé sur les contrats `tachyon:messaging`.
-- [x] `task-3` : Intégrer le binding Wasm de Tree-sitter dans `nebula-eval-ast` et implémenter l'algorithme de hachage structurel.
-- [x] `task-4` : Implémenter le FaaS de similarité vectorielle `nebula-eval-semantic` exploitant le contrat `tachyon:inference`.
-- [x] `task-5` : Implémenter l'agrégateur et la persistance des lots dans le store KV de Tachyon.
+- [x] `task-1`: Create the Rust workspace tree under `faas/` (`nebula-telemetry-gateway`, `nebula-eval-ast`, `nebula-eval-semantic`, `nebula-divergence-aggregator`).
+- [x] `task-2`: Implement the `nebula-telemetry-gateway` event router based on `tachyon:messaging` contracts.
+- [x] `task-3`: Integrate the Tree-sitter Wasm binding into `nebula-eval-ast` and implement the structural hashing algorithm.
+- [x] `task-4`: Implement the `nebula-eval-semantic` vector-similarity FaaS using the `tachyon:inference` contract.
+- [x] `task-5`: Implement the aggregator and batch persistence in Tachyon's KV store.

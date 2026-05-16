@@ -1,20 +1,20 @@
-# Design : Forge Teacher Tier 3
+# Design: Tier 3 Teacher Forge
 
 ## Architecture
 
-La forge Teacher ajoute quatre fonctions Rust/Wasm sous `faas/` :
+The Teacher forge adds four Rust/Wasm functions under `faas/`:
 
-- `nebula-curriculum-generator` cree des examens synthetiques et les injecte dans la file d'inference Tier 1/2 avec un header de correlation.
-- `nebula-teacher-arbitrator` consomme les cas divergents, orchestre le modele Tier 3 couche par couche et emet des reponses corrigees strictement decodees en JSON.
-- `nebula-dataset-forge` applique le ratio 60/40 entre escalades resolues et succes directs, puis persiste le dataset append-only en JSONL.
-- `nebula-training-orchestrator` lance l'entrainement LoRA, fusionne l'adaptateur et publie le modele via `wkg`.
+- `nebula-curriculum-generator` creates synthetic exams and injects them into the Tier 1/2 inference queue with a correlation header.
+- `nebula-teacher-arbitrator` consumes divergent cases, orchestrates the Tier 3 model layer by layer, and emits corrected answers decoded strictly as JSON.
+- `nebula-dataset-forge` applies the 60/40 ratio between resolved escalations and direct successes, then persists the dataset as append-only JSONL.
+- `nebula-training-orchestrator` launches LoRA training, merges the adapter, and publishes the model through `wkg`.
 
-Les integrations runtime sont representees par des traits injectables pour conserver des crates deterministes et testables sans GPU, sans registre OCI local et sans runtime Tachyon actif.
+Runtime integrations are represented by injectable traits so the crates remain deterministic and testable without a GPU, local OCI registry, or active Tachyon runtime.
 
-## Flux
+## Flow
 
-1. Le curriculum generator produit des taches proactives et les pousse vers Tachyon.
-2. L'arbitrator traite les lots `nebula:tier3:arbitration` issus du pipeline de divergence.
-3. Les corrections Tier 3 et les succes directs alimentent `nebula.dataset.append`.
-4. Le dataset forge emet `nebula.training.ready` lorsque le seuil est atteint.
-5. Le training orchestrator produit et publie `pulsar-base-v2.safetensors`, puis notifie l'extension.
+1. The curriculum generator produces proactive tasks and pushes them to Tachyon.
+2. The arbitrator processes `nebula:tier3:arbitration` batches emitted by the divergence pipeline.
+3. Tier 3 corrections and direct successes feed `nebula.dataset.append`.
+4. The dataset forge emits `nebula.training.ready` when the threshold is reached.
+5. The training orchestrator produces and publishes `pulsar-base-v2.safetensors`, then notifies the extension.

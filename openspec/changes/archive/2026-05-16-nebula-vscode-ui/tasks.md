@@ -1,7 +1,7 @@
-# Tâches d'implémentation
+# Implementation Tasks
 
-- [x] `task-1` : Configurer le bundler (Vite/Esbuild) dans `packages/extension` pour compiler les assets front-end de la Webview.
-- [x] `task-2` : Implémenter le Provider VSCode (Message Passing) pour synchroniser l'état entre la Webview et le processus Node.js de l'extension.
-- [x] `task-3` : Développer le composant UI de la Jauge de Dataset avec le suivi du ratio contrastif (60/40).
-- [x] `task-4` : Développer le formulaire "Générateur de Curriculum" et câbler l'envoi de la commande via le WebSocket sécurisé.
-- [x] `task-5` : Intégrer le moniteur de logs en temps réel pour visualiser le travail de l'arbitre Tier 3 (DeepSeek).
+- [x] `task-1`: Configure the bundler (Vite/esbuild) in `packages/extension` to compile webview frontend assets.
+- [x] `task-2`: Implement the VS Code provider (message passing) to synchronize state between the webview and the extension Node.js process.
+- [x] `task-3`: Build the Dataset Gauge UI component with contrastive ratio tracking (60/40).
+- [x] `task-4`: Build the "Curriculum Generator" form and wire command submission through the secure WebSocket.
+- [x] `task-5`: Integrate the real-time log monitor for visualizing Tier 3 arbitrator work (DeepSeek).

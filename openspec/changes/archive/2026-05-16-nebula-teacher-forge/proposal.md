@@ -1,12 +1,14 @@
-# Proposition : Forge de Dataset et Arbitrage Tier 3
+# Proposal: Dataset Forge and Tier 3 Arbitration
 
-## Contexte
-Une fois les zones d'incertitudes et d'hallucinations des agents locaux (Tier 1/2) identifiées par le pipeline d'évaluation, ces impasses doivent être résolues par un modèle disposant d'un raisonnement supérieur (Teacher Model / Tier 3, ex: DeepSeek). Ce processus doit s'exécuter sous de fortes contraintes matérielles (VRAM limitée) et aboutir à la création automatisée de fichiers de poids neuronaux (LoRA).
+## Context
 
-## Objectifs
-Implémenter la chaîne de distillation et d'entraînement dans `faas/` :
+Once uncertainty and hallucination zones in local Tier 1/2 agents have been identified by the evaluation pipeline, those dead ends must be resolved by a model with stronger reasoning capability (Teacher Model / Tier 3, for example DeepSeek). This process must run under strict hardware constraints (limited VRAM) and produce automated neural weight artifacts (LoRA).
 
-1. **`nebula-curriculum-generator`** : FaaS initiant des examens synthétiques de connaissances (ex: Cobol, Rust) pour tester les petits modèles de manière proactive (sans documentation).
-2. **`nebula-teacher-arbitrator`** : Le FaaS lourd qui orchestre le chargement progressif (layer-by-layer) du modèle Tier 3 via l'interface `tachyon:inference` pour corriger les hallucinations.
-3. **`nebula-dataset-forge`** : Le FaaS de stockage qui assemble les paires contrastives dans un volume persistant (`.jsonl`) tout en garantissant le ratio de confiance (60% échec résolu / 40% succès direct).
-4. **`nebula-training-orchestrator`** : FaaS déclenché à un seuil défini (ex: 500 exemples) pour piloter l'entraînement de la couche LoRA et sa publication sur le registre d'artefacts local.
+## Objectives
+
+Implement the distillation and training chain under `faas/`:
+
+1. **`nebula-curriculum-generator`**: FaaS that initiates synthetic knowledge exams (for example Cobol or Rust) to proactively test small models without documentation.
+2. **`nebula-teacher-arbitrator`**: Heavy FaaS that orchestrates layer-by-layer Tier 3 model loading through `tachyon:inference` to correct hallucinations.
+3. **`nebula-dataset-forge`**: Storage FaaS that assembles contrastive pairs into a persistent `.jsonl` volume while enforcing the confidence ratio (60% resolved failures / 40% direct successes).
+4. **`nebula-training-orchestrator`**: FaaS triggered at a configured threshold (for example 500 examples) to drive LoRA training and publish the resulting layer to the local artifact registry.

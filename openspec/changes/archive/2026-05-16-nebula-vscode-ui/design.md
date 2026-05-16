@@ -1,23 +1,23 @@
-# Design : Tableau de bord VS Code
+# Design: VS Code Dashboard
 
 ## Architecture
 
-Le dashboard est separe du host VS Code :
+The dashboard is separated from the VS Code host:
 
-- `NebulaDashboardProvider` gere le panneau webview, l'etat applicatif, le message passing VS Code et le relais WebSocket mTLS.
-- `src/webview/main.ts` contient l'interface compilee par esbuild vers `media/webview.js`.
-- `messages.ts` formalise les enveloppes `EVENT|COMMAND` et l'etat partage.
+- `NebulaDashboardProvider` manages the webview panel, application state, VS Code message passing, and the mTLS WebSocket relay.
+- `src/webview/main.ts` contains the interface compiled by esbuild into `media/webview.js`.
+- `messages.ts` formalizes the `EVENT|COMMAND` envelopes and shared state.
 
-## Flux
+## Flow
 
-Le webview envoie les commandes utilisateur via `acquireVsCodeApi().postMessage()`. Le provider les normalise en enveloppes `{ type: "COMMAND", action, payload }` et les transmet au CLI par WSS.
+The webview sends user commands through `acquireVsCodeApi().postMessage()`. The provider normalizes them into `{ type: "COMMAND", action, payload }` envelopes and forwards them to the CLI over WSS.
 
-Les evenements WSS entrants mettent a jour l'etat local :
+Incoming WSS events update local state:
 
-- `nebula.dataset.append` incremente la jauge dataset et le ratio 60/40.
-- `nebula.eval.results` alimente le journal de divergences.
-- `nebula.training.ready` et `nebula.training.complete` pilotent l'etat LoRA.
+- `nebula.dataset.append` increments the dataset gauge and the 60/40 ratio.
+- `nebula.eval.results` feeds the divergence log.
+- `nebula.training.ready` and `nebula.training.complete` drive the LoRA state.
 
 ## UI
 
-L'interface reste native VS Code en utilisant les variables de theme. Elle expose une jauge dataset, le formulaire curriculum, les etapes LoRA et un flux de logs Tier 3.
+The interface remains native to VS Code by using theme variables. It exposes a dataset gauge, the curriculum form, LoRA stages, and a Tier 3 log stream.

@@ -1,20 +1,20 @@
-# Design : CI/CD Nebula
+# Design: Nebula CI/CD
 
 ## Architecture
 
-La CI est separee en deux jobs paralleles :
+CI is split into two parallel jobs:
 
-- `validate-node` installe les workspaces npm, lance le lint, le build et les tests Node.
-- `validate-rust-wasm` installe Rust stable, `cargo-component`, `clang`, `wasi-libc`, la cible `wasm32-wasip1`, puis lance formatage, clippy et tests.
+- `validate-node` installs npm workspaces, then runs linting, build, and Node tests.
+- `validate-rust-wasm` installs Rust stable, `cargo-component`, `clang`, `wasi-libc`, the `wasm32-wasip1` target, then runs formatting, clippy, and tests.
 
-Le workflow release se declenche uniquement sur les tags `v*`. Il construit les packages Node, genere le `.vsix`, construit et pousse les composants FaaS vers GHCR, puis cree une GitHub Release.
+The release workflow runs only on `v*` tags. It builds Node packages, produces the `.vsix`, builds and pushes FaaS components to GHCR, then creates a GitHub Release.
 
-## Publication FaaS
+## FaaS Publication
 
-Le script `scripts/publish-faas-oci.sh` decouvre les crates sous `faas/*/Cargo.toml`, execute `cargo component build --release --package <crate>` et pousse chaque composant avec `wkg push`.
+The `scripts/publish-faas-oci.sh` script discovers crates under `faas/*/Cargo.toml`, runs `cargo component build --release --package <crate>`, and pushes each component with `wkg push`.
 
-Le registre et le tag sont parametrables via `OCI_REGISTRY` et `OCI_TAG`, ce qui permet au workflow release d'utiliser `ghcr.io/<owner>/nebula` et le tag Git courant.
+The registry and tag are configurable through `OCI_REGISTRY` and `OCI_TAG`, allowing the release workflow to use `ghcr.io/<owner>/nebula` and the current Git tag.
 
 ## Notes
 
-La cible Rust moderne equivalente a WASI preview 1 est `wasm32-wasip1`. Le workflow installe cette cible pour rester compatible avec les toolchains Rust actuelles tout en couvrant l'exigence Wasm/WASI.
+The modern Rust target equivalent to WASI preview 1 is `wasm32-wasip1`. The workflow installs this target to stay compatible with current Rust toolchains while covering the Wasm/WASI requirement.

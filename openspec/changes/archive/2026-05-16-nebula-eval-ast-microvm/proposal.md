@@ -1,11 +1,13 @@
-# Proposition : Parseur AST via SmolVM et gRPC (virtio-vsock)
+# Proposal: AST Parser through SmolVM and gRPC (virtio-vsock)
 
-## Contexte
-L'évaluation syntaxique des LLMs (détection d'hallucinations) requiert le moteur C `tree-sitter`. L'environnement WASI étant incompatible avec cette dépendance native, le composant `nebula-eval-ast` sera packagé sous forme de MicroVM Linux (SmolVM) orchestrée par Tachyon.
+## Context
 
-## Objectifs
-Pour garantir un overhead quasi-nul lors des transferts mémoire entre le maillage WebAssembly et la MicroVM, l'architecture réseau reposera sur un canal `virtio-vsock` multiplexé via le protocole gRPC.
+Syntax evaluation for LLMs (hallucination detection) requires the native C `tree-sitter` engine. Because the WASI environment is incompatible with that native dependency, the `nebula-eval-ast` component is packaged as a Linux microVM (SmolVM) orchestrated by Tachyon.
 
-1. **Protocole Binaire (Protobuf)** : Éliminer la coûteuse sérialisation JSON en définissant un contrat Protobuf strict pour l'envoi des réponses LLM et la réception du statut de divergence.
-2. **Serveur gRPC (Tonic/UDS)** : Implémenter le binaire Rust interne à la MicroVM via le framework `tonic`, configuré pour écouter sur un Unix Domain Socket (UDS) mappé au périphérique VSOCK.
-3. **Packaging OCI** : Encapsuler ce binaire et les bibliothèques C partagées dans un système de fichiers `rootfs.ext4` distribué sur le registre d'artefacts.
+## Objectives
+
+To ensure near-zero overhead for memory transfers between the WebAssembly mesh and the microVM, the network architecture relies on a `virtio-vsock` channel multiplexed through gRPC.
+
+1. **Binary Protocol (Protobuf)**: Remove expensive JSON serialization by defining a strict Protobuf contract for sending LLM responses and receiving divergence status.
+2. **gRPC Server (Tonic/UDS)**: Implement the Rust binary inside the microVM with `tonic`, configured to listen on a Unix Domain Socket (UDS) mapped to the VSOCK device.
+3. **OCI Packaging**: Package this binary and shared C libraries into a `rootfs.ext4` filesystem distributed through the artifact registry.
