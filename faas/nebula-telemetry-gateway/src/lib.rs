@@ -1,9 +1,12 @@
 use anyhow::{anyhow, Result};
+use prost::Message;
 use serde::{Deserialize, Serialize};
 
 pub const INPUT_TOPIC: &str = "pulsar.telemetry.inference_triplets";
 pub const AST_TOPIC: &str = "nebula.eval.ast.pending";
 pub const SEMANTIC_TOPIC: &str = "nebula.eval.semantic.pending";
+pub const AST_MICROVM_URL: &str =
+    "http://nebula-eval-ast.microvm.internal/nebula.ast.AstEvaluator/EvaluateTriplets";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct InferenceTriplet {
@@ -22,6 +25,18 @@ pub struct RoutedEvent {
 
 pub trait EventBus {
     fn publish(&mut self, topic: &str, payload: &InferenceTriplet) -> Result<()>;
+}
+
+pub trait WasiHttpClient {
+    fn post_grpc(&mut self, url: &str, body: &[u8]) -> Result<Vec<u8>>;
+}
+
+#[derive(Clone, PartialEq, Message)]
+pub struct AstEvaluationRequest {
+    #[prost(string, tag = "1")]
+    pub language: String,
+    #[prost(string, repeated, tag = "2")]
+    pub responses: Vec<String>,
 }
 
 pub fn route_triplet(payload: InferenceTriplet) -> RoutedEvent {
@@ -53,11 +68,44 @@ pub fn handle_event(
     Ok(event)
 }
 
+pub fn dispatch_ast_to_microvm(
+    client: &mut impl WasiHttpClient,
+    triplet: &InferenceTriplet,
+) -> Result<Vec<u8>> {
+    let request = AstEvaluationRequest {
+        language: infer_language(&triplet.task_type),
+        responses: triplet.responses.to_vec(),
+    };
+    let frame = encode_grpc_frame(&request)?;
+    client.post_grpc(AST_MICROVM_URL, &frame)
+}
+
+pub fn encode_grpc_frame(message: &impl Message) -> Result<Vec<u8>> {
+    let mut payload = Vec::new();
+    message.encode(&mut payload)?;
+
+    let mut frame = Vec::with_capacity(payload.len() + 5);
+    frame.push(0);
+    frame.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+    frame.extend_from_slice(&payload);
+    Ok(frame)
+}
+
 fn is_code_task(task_type: &str) -> bool {
     matches!(task_type, "code_generation" | "rust" | "cobol" | "wasm")
         || ["code", "rust", "cobol", "wasm", "typescript", "python"]
             .iter()
             .any(|tag| task_type.contains(tag))
+}
+
+fn infer_language(task_type: &str) -> String {
+    let normalized = task_type.to_ascii_lowercase();
+    ["rust", "cobol", "wasm", "typescript", "python"]
+        .iter()
+        .find(|language| normalized.contains(**language))
+        .copied()
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 #[cfg(test)]
@@ -86,5 +134,17 @@ mod tests {
         });
 
         assert_eq!(event.topic, SEMANTIC_TOPIC);
+    }
+
+    #[test]
+    fn encodes_grpc_frame_for_ast_microvm() {
+        let frame = encode_grpc_frame(&AstEvaluationRequest {
+            language: "rust".into(),
+            responses: vec!["a".into(), "b".into(), "c".into()],
+        })
+        .unwrap();
+
+        assert_eq!(frame[0], 0);
+        assert!(frame.len() > 5);
     }
 }

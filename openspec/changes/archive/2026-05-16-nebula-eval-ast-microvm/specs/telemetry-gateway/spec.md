@@ -1,8 +1,5 @@
-# telemetry-gateway Specification
+## MODIFIED Requirements
 
-## Purpose
-TBD - created by archiving change nebula-data-pipeline. Update Purpose after archive.
-## Requirements
 ### Requirement: Telemetry gateway routes inference triplets
 
 The telemetry gateway SHALL subscribe to Pulsar inference triplets and route them to the appropriate Nebula evaluator topic.
@@ -30,4 +27,3 @@ The telemetry gateway SHALL subscribe to Pulsar inference triplets and route the
 - **THEN** it encodes `EvaluationRequest` as Protobuf
 - **AND** it wraps the payload in a gRPC frame
 - **AND** it sends the frame to `http://nebula-eval-ast.microvm.internal/nebula.ast.AstEvaluator/EvaluateTriplets` through the host HTTP bridge
-

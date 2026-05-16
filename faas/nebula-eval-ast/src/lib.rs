@@ -1,9 +1,15 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use tree_sitter::Parser;
 
 pub const RESULTS_TOPIC: &str = "nebula.eval.results";
 pub const SEMANTIC_FALLBACK_TOPIC: &str = "nebula.eval.semantic.pending";
+pub const DEFAULT_SOCKET_PATH: &str = "/run/guest.sock";
+
+pub mod proto {
+    tonic::include_proto!("nebula.ast");
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct AstEvaluationRequest {
@@ -91,6 +97,7 @@ pub fn structural_hashes(responses: &[String; 3]) -> Result<[String; 3]> {
 
 pub fn structural_hash(response: &str) -> Result<String> {
     let code = extract_code_block(response).ok_or_else(|| anyhow!("no code block found"))?;
+    let _parser = Parser::new();
     let features = structural_features(code);
 
     if features.is_empty() {
@@ -100,6 +107,29 @@ pub fn structural_hash(response: &str) -> Result<String> {
     let mut hasher = Sha256::new();
     hasher.update(features.join("|"));
     Ok(format!("{:x}", hasher.finalize()))
+}
+
+pub fn evaluate_proto_request(request: proto::EvaluationRequest) -> proto::EvaluationResponse {
+    let responses = match <[String; 3]>::try_from(request.responses) {
+        Ok(responses) => responses,
+        Err(responses) => {
+            return proto::EvaluationResponse {
+                diverged: false,
+                fallback_reason: Some(format!("expected 3 responses, got {}", responses.len())),
+            };
+        }
+    };
+
+    match structural_hashes(&responses) {
+        Ok(hashes) => proto::EvaluationResponse {
+            diverged: !hashes.iter().all(|hash| hash == &hashes[0]),
+            fallback_reason: None,
+        },
+        Err(error) => proto::EvaluationResponse {
+            diverged: false,
+            fallback_reason: Some(error.to_string()),
+        },
+    }
 }
 
 fn extract_code_block(response: &str) -> Option<&str> {

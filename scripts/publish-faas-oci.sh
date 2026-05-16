@@ -16,6 +16,11 @@ for manifest in ./*/Cargo.toml; do
     continue
   fi
 
+  if [[ "${crate_name}" == "nebula-eval-ast" ]]; then
+    echo "Skipping ${crate_name}; it is packaged as a microVM rootfs."
+    continue
+  fi
+
   echo "Building ${crate_name}"
   cargo component build --release --package "${crate_name}"
 

@@ -27,10 +27,10 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-wasip1
+          targets: wasm32-wasip1, x86_64-unknown-linux-musl
 
-      - name: Install WASI C toolchain
-        run: sudo apt-get update && sudo apt-get install -y clang wasi-libc
+      - name: Install native build tools
+        run: sudo apt-get update && sudo apt-get install -y clang protobuf-compiler musl-tools e2fsprogs
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2
@@ -58,8 +58,10 @@ jobs:
         env:
           OCI_REGISTRY: ghcr.io/${{ github.repository_owner }}/nebula
           OCI_TAG: ${{ github.ref_name }}
-          WASI_SYSROOT: /usr/share/wasi-sysroot
         run: bash scripts/publish-faas-oci.sh
+
+      - name: Build AST microVM rootfs
+        run: bash scripts/build-eval-ast-rootfs.sh
 
       - name: Publish CLI to npm
         env:
@@ -74,4 +76,6 @@ jobs:
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: nebula-vscode-${{ github.ref_name }}.vsix
+          files: |
+            nebula-vscode-${{ github.ref_name }}.vsix
+            artifacts/microvm/nebula-eval-ast/rootfs.ext4

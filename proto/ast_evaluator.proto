@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package nebula.ast;
+
+service AstEvaluator {
+  rpc EvaluateTriplets(EvaluationRequest) returns (EvaluationResponse);
+}
+
+message EvaluationRequest {
+  string language = 1;
+  repeated string responses = 2;
+}
+
+message EvaluationResponse {
+  bool diverged = 1;
+  optional string fallback_reason = 2;
+}
