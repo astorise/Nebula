@@ -27,9 +27,15 @@ pub trait ArbitrationQueue {
 pub trait LayeredInference {
     fn layer_count(&self, model: &str) -> Result<usize>;
     fn load_layer(&mut self, model: &str, layer: usize) -> Result<()>;
-    fn forward_layer(&mut self, model: &str, layer: usize, batch: &[ArbitrationTask]) -> Result<()>;
+    fn forward_layer(&mut self, model: &str, layer: usize, batch: &[ArbitrationTask])
+        -> Result<()>;
     fn unload_layer(&mut self, model: &str, layer: usize) -> Result<()>;
-    fn decode_json(&mut self, model: &str, schema: &serde_json::Value, batch: &[ArbitrationTask]) -> Result<Vec<PerfectAnswer>>;
+    fn decode_json(
+        &mut self,
+        model: &str,
+        schema: &serde_json::Value,
+        batch: &[ArbitrationTask],
+    ) -> Result<Vec<PerfectAnswer>>;
 }
 
 pub trait EventBus {
@@ -92,17 +98,41 @@ mod tests {
     }
 
     impl LayeredInference for Inference {
-        fn layer_count(&self, _model: &str) -> Result<usize> { Ok(2) }
-        fn load_layer(&mut self, _model: &str, layer: usize) -> Result<()> { self.0.push(format!("load:{layer}")); Ok(()) }
-        fn forward_layer(&mut self, _model: &str, layer: usize, _batch: &[ArbitrationTask]) -> Result<()> { self.0.push(format!("forward:{layer}")); Ok(()) }
-        fn unload_layer(&mut self, _model: &str, layer: usize) -> Result<()> { self.0.push(format!("unload:{layer}")); Ok(()) }
-        fn decode_json(&mut self, _model: &str, _schema: &serde_json::Value, batch: &[ArbitrationTask]) -> Result<Vec<PerfectAnswer>> {
-            Ok(batch.iter().map(|task| PerfectAnswer {
-                prompt: task.prompt.clone(),
-                answer: "fixed".into(),
-                source: "tier3".into(),
-                context: task.pulsar_context.clone(),
-            }).collect())
+        fn layer_count(&self, _model: &str) -> Result<usize> {
+            Ok(2)
+        }
+        fn load_layer(&mut self, _model: &str, layer: usize) -> Result<()> {
+            self.0.push(format!("load:{layer}"));
+            Ok(())
+        }
+        fn forward_layer(
+            &mut self,
+            _model: &str,
+            layer: usize,
+            _batch: &[ArbitrationTask],
+        ) -> Result<()> {
+            self.0.push(format!("forward:{layer}"));
+            Ok(())
+        }
+        fn unload_layer(&mut self, _model: &str, layer: usize) -> Result<()> {
+            self.0.push(format!("unload:{layer}"));
+            Ok(())
+        }
+        fn decode_json(
+            &mut self,
+            _model: &str,
+            _schema: &serde_json::Value,
+            batch: &[ArbitrationTask],
+        ) -> Result<Vec<PerfectAnswer>> {
+            Ok(batch
+                .iter()
+                .map(|task| PerfectAnswer {
+                    prompt: task.prompt.clone(),
+                    answer: "fixed".into(),
+                    source: "tier3".into(),
+                    context: task.pulsar_context.clone(),
+                })
+                .collect())
         }
     }
 

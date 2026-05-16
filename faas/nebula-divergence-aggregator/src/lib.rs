@@ -28,7 +28,11 @@ pub trait KvListStore {
     fn push_json(&mut self, key: &str, value: &ArbitrationTask) -> Result<usize>;
 }
 
-pub fn aggregate_and_persist(store: &mut impl KvListStore, topic: &str, result: EvaluationResult) -> Result<Option<usize>> {
+pub fn aggregate_and_persist(
+    store: &mut impl KvListStore,
+    topic: &str,
+    result: EvaluationResult,
+) -> Result<Option<usize>> {
     if topic != RESULTS_TOPIC || !result.diverged {
         return Ok(None);
     }
@@ -69,6 +73,9 @@ mod tests {
             context: serde_json::json!({ "agent": "pulsar" }),
         };
 
-        assert_eq!(aggregate_and_persist(&mut store, RESULTS_TOPIC, result).unwrap(), Some(1));
+        assert_eq!(
+            aggregate_and_persist(&mut store, RESULTS_TOPIC, result).unwrap(),
+            Some(1)
+        );
     }
 }

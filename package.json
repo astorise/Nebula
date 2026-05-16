@@ -7,7 +7,9 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces",
-    "check": "npm run check --workspaces"
+    "check": "npm run check --workspaces",
+    "lint": "npm run check",
+    "test": "npm run check"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",

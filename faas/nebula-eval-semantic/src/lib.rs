@@ -52,11 +52,16 @@ pub fn evaluate_and_publish(
     Ok(decision)
 }
 
-pub fn evaluate(inference: &impl InferenceHost, request: SemanticEvaluationRequest) -> Result<SemanticDecision> {
+pub fn evaluate(
+    inference: &impl InferenceHost,
+    request: SemanticEvaluationRequest,
+) -> Result<SemanticDecision> {
     let baseline = inference.embed(DEFAULT_MODEL, &request.responses[0])?;
     let first_hot = inference.embed(DEFAULT_MODEL, &request.responses[1])?;
     let second_hot = inference.embed(DEFAULT_MODEL, &request.responses[2])?;
-    let average_similarity = (cosine_similarity(&baseline, &first_hot)? + cosine_similarity(&baseline, &second_hot)?) / 2.0;
+    let average_similarity = (cosine_similarity(&baseline, &first_hot)?
+        + cosine_similarity(&baseline, &second_hot)?)
+        / 2.0;
 
     if average_similarity >= 0.95 {
         return Ok(SemanticDecision::Ignore { average_similarity });
@@ -123,6 +128,9 @@ mod tests {
             context: serde_json::json!({}),
         };
 
-        assert!(matches!(evaluate(&Host, request).unwrap(), SemanticDecision::Diverged(_)));
+        assert!(matches!(
+            evaluate(&Host, request).unwrap(),
+            SemanticDecision::Diverged(_)
+        ));
     }
 }

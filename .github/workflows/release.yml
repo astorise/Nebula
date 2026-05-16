@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Build and publish release artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: https://registry.npmjs.org
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - name: Install WASI C toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang wasi-libc
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: faas
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Install Wasm tooling
+        run: cargo install cargo-component wkg --locked
+
+      - name: Build Node packages
+        run: npm run build
+
+      - name: Package VS Code extension
+        run: cd packages/extension && npx --yes @vscode/vsce package --out ../../nebula-vscode-${{ github.ref_name }}.vsix
+
+      - name: Publish FaaS components to GHCR
+        env:
+          OCI_REGISTRY: ghcr.io/${{ github.repository_owner }}/nebula
+          OCI_TAG: ${{ github.ref_name }}
+          WASI_SYSROOT: /usr/share/wasi-sysroot
+        run: bash scripts/publish-faas-oci.sh
+
+      - name: Publish CLI to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "NPM_TOKEN is not configured; skipping npm publish."
+            exit 0
+          fi
+          npm publish --workspace @nebula/cli --access public
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: nebula-vscode-${{ github.ref_name }}.vsix

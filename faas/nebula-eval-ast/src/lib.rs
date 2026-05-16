@@ -58,7 +58,10 @@ pub fn evaluate_and_publish(
     Ok(decision)
 }
 
-pub fn evaluate(registry: &impl GrammarRegistry, request: AstEvaluationRequest) -> Result<AstDecision> {
+pub fn evaluate(
+    registry: &impl GrammarRegistry,
+    request: AstEvaluationRequest,
+) -> Result<AstDecision> {
     let _grammar_wasm = registry.load_wasm_grammar(&request.language)?;
     let hashes = match structural_hashes(&request.responses) {
         Ok(hashes) => hashes,
@@ -122,7 +125,10 @@ fn structural_features(code: &str) -> Vec<String> {
 
         push_token_feature(&mut features, &mut token);
 
-        if matches!(ch, '{' | '}' | '(' | ')' | '[' | ']' | ';' | ',' | '<' | '>' | '=') {
+        if matches!(
+            ch,
+            '{' | '}' | '(' | ')' | '[' | ']' | ';' | ',' | '<' | '>' | '='
+        ) {
             features.push(ch.to_string());
         }
     }
@@ -139,7 +145,19 @@ fn push_token_feature(features: &mut Vec<String>, token: &mut String) {
     let value = token.as_str();
     if matches!(
         value,
-        "fn" | "if" | "else" | "match" | "for" | "while" | "loop" | "struct" | "enum" | "impl" | "trait" | "async" | "await" | "return"
+        "fn" | "if"
+            | "else"
+            | "match"
+            | "for"
+            | "while"
+            | "loop"
+            | "struct"
+            | "enum"
+            | "impl"
+            | "trait"
+            | "async"
+            | "await"
+            | "return"
     ) {
         features.push(value.to_string());
     }

@@ -83,7 +83,11 @@ mod tests {
             Ok("adapter.safetensors".into())
         }
 
-        fn merge_adapter(&mut self, _adapter_path: &str, config: &TrainingConfig) -> Result<String> {
+        fn merge_adapter(
+            &mut self,
+            _adapter_path: &str,
+            config: &TrainingConfig,
+        ) -> Result<String> {
             Ok(config.output_model.clone())
         }
     }
@@ -111,11 +115,18 @@ mod tests {
             &mut trainer,
             &mut publisher,
             &mut notifier,
-            TrainingReadyEvent { dataset_path: "dataset_v1.jsonl".into(), examples: 500 },
+            TrainingReadyEvent {
+                dataset_path: "dataset_v1.jsonl".into(),
+                examples: 500,
+            },
             TrainingConfig::default(),
-        ).unwrap();
+        )
+        .unwrap();
 
-        assert_eq!(complete.artifact_ref, "oci://localhost:5000/pulsar-models/base:v2");
+        assert_eq!(
+            complete.artifact_ref,
+            "oci://localhost:5000/pulsar-models/base:v2"
+        );
         assert!(notifier.0);
     }
 }

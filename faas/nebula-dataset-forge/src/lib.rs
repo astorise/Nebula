@@ -69,10 +69,13 @@ pub fn append_example(
     let updated = counters.increment(&example.source)?;
 
     if updated.total() >= threshold {
-        bus.publish_training_ready(TRAINING_READY_TOPIC, &TrainingReadyEvent {
-            dataset_path: DATASET_FILE.into(),
-            examples: updated.total(),
-        })?;
+        bus.publish_training_ready(
+            TRAINING_READY_TOPIC,
+            &TrainingReadyEvent {
+                dataset_path: DATASET_FILE.into(),
+                examples: updated.total(),
+            },
+        )?;
     }
 
     Ok(true)
@@ -80,8 +83,14 @@ pub fn append_example(
 
 fn ratio_allows(counters: DatasetCounters, source: &ExampleSource) -> bool {
     let next = match source {
-        ExampleSource::Escalated => DatasetCounters { escalated: counters.escalated + 1, ..counters },
-        ExampleSource::Direct => DatasetCounters { direct: counters.direct + 1, ..counters },
+        ExampleSource::Escalated => DatasetCounters {
+            escalated: counters.escalated + 1,
+            ..counters
+        },
+        ExampleSource::Direct => DatasetCounters {
+            direct: counters.direct + 1,
+            ..counters
+        },
     };
     let total = next.total() as f32;
 
@@ -104,7 +113,9 @@ mod tests {
     struct Bus(usize);
 
     impl CounterStore for Counters {
-        fn counters(&self) -> Result<DatasetCounters> { Ok(self.0) }
+        fn counters(&self) -> Result<DatasetCounters> {
+            Ok(self.0)
+        }
         fn increment(&mut self, source: &ExampleSource) -> Result<DatasetCounters> {
             match source {
                 ExampleSource::Escalated => self.0.escalated += 1,
@@ -122,7 +133,11 @@ mod tests {
     }
 
     impl EventBus for Bus {
-        fn publish_training_ready(&mut self, _topic: &str, _event: &TrainingReadyEvent) -> Result<()> {
+        fn publish_training_ready(
+            &mut self,
+            _topic: &str,
+            _event: &TrainingReadyEvent,
+        ) -> Result<()> {
             self.0 += 1;
             Ok(())
         }

@@ -38,7 +38,11 @@ pub fn route_triplet(payload: InferenceTriplet) -> RoutedEvent {
     }
 }
 
-pub fn handle_event(bus: &mut impl EventBus, topic: &str, raw_payload: &[u8]) -> Result<RoutedEvent> {
+pub fn handle_event(
+    bus: &mut impl EventBus,
+    topic: &str,
+    raw_payload: &[u8],
+) -> Result<RoutedEvent> {
     if topic != INPUT_TOPIC {
         return Err(anyhow!("unsupported topic: {topic}"));
     }
