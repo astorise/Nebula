@@ -9,6 +9,7 @@ export interface TachyonMessage {
 export interface TachyonRouter {
   route(message: TachyonMessage): Promise<TachyonMessage>;
   onEvent(listener: (message: TachyonMessage) => void): () => void;
+  emitEvent(message: TachyonMessage): void;
 }
 
 export class StubTachyonRouter implements TachyonRouter {
@@ -31,5 +32,9 @@ export class StubTachyonRouter implements TachyonRouter {
   onEvent(listener: (message: TachyonMessage) => void): () => void {
     this.events.on("event", listener);
     return () => this.events.off("event", listener);
+  }
+
+  emitEvent(message: TachyonMessage): void {
+    this.events.emit("event", message);
   }
 }

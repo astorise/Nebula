@@ -1,12 +1,21 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import { watch, type FSWatcher } from "node:fs";
 import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { TachyonRouter } from "./tachyon";
 
 const READ_METHODS = new Set(["GET", "HEAD", "OPTIONS", "PROPFIND"]);
 const MUTATING_METHODS = new Set(["PUT", "POST", "DELETE", "MKCOL", "MOVE", "COPY", "PATCH", "LOCK", "UNLOCK", "PROPPATCH"]);
 
 export interface WebDavContext {
   docsRoot: string;
+}
+
+export interface FileUpdatedPayload {
+  path: string;
+  mime_type: string;
+  sha256: string;
 }
 
 export async function handleWebDav(req: IncomingMessage, res: ServerResponse, context: WebDavContext): Promise<void> {
@@ -132,4 +141,93 @@ function renderMultistatus(root: string, entries: Array<{ filePath: string; stat
 
 function escapeXml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+}
+
+export function watchWebDavRoot(docsRoot: string, router: TachyonRouter, debounceMs = 2000): FSWatcher {
+  const timers = new Map<string, NodeJS.Timeout>();
+  const watcher = watch(docsRoot, { recursive: true }, (_eventType, filename) => {
+    if (!filename) {
+      return;
+    }
+
+    const absolutePath = path.resolve(docsRoot, filename.toString());
+    const relative = path.relative(docsRoot, absolutePath);
+    if (relative.startsWith("..") || path.isAbsolute(relative)) {
+      return;
+    }
+
+    const existing = timers.get(absolutePath);
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    timers.set(
+      absolutePath,
+      setTimeout(() => {
+        timers.delete(absolutePath);
+        void emitFileUpdated(docsRoot, absolutePath, router);
+      }, debounceMs)
+    );
+  });
+
+  watcher.on("close", () => {
+    for (const timer of timers.values()) {
+      clearTimeout(timer);
+    }
+    timers.clear();
+  });
+
+  return watcher;
+}
+
+async function emitFileUpdated(docsRoot: string, absolutePath: string, router: TachyonRouter): Promise<void> {
+  try {
+    const stat = await fs.stat(absolutePath);
+    if (!stat.isFile()) {
+      return;
+    }
+
+    const file = await fs.readFile(absolutePath);
+    const relativePath = `/${path.relative(docsRoot, absolutePath).replaceAll(path.sep, "/")}`;
+    const payload: FileUpdatedPayload = {
+      path: relativePath,
+      mime_type: mimeTypeFor(absolutePath),
+      sha256: crypto.createHash("sha256").update(file).digest("hex")
+    };
+
+    router.emitEvent({
+      type: "EVENT",
+      payload: {
+        topic: "nebula.fs.file_updated",
+        payload
+      }
+    });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== "ENOENT") {
+      router.emitEvent({
+        type: "nebula.fs.watch_error",
+        payload: {
+          path: absolutePath,
+          message: error instanceof Error ? error.message : "Unknown watcher error"
+        }
+      });
+    }
+  }
+}
+
+function mimeTypeFor(filePath: string): string {
+  switch (path.extname(filePath).toLowerCase()) {
+    case ".pdf":
+      return "application/pdf";
+    case ".md":
+    case ".markdown":
+      return "text/markdown";
+    case ".docx":
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    case ".txt":
+      return "text/plain";
+    default:
+      return "application/octet-stream";
+  }
 }

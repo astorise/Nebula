@@ -582,6 +582,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nebula-doc-parser"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "nebula-eval-ast"
 version = "0.1.0"
 dependencies = [
@@ -600,6 +610,15 @@ dependencies = [
 
 [[package]]
 name = "nebula-eval-semantic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nebula-semantic-chunker"
 version = "0.1.0"
 dependencies = [
  "anyhow",

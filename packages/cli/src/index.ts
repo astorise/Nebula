@@ -3,7 +3,7 @@ import https from "node:https";
 import { loadConfig } from "./config";
 import { loadTlsOptions } from "./security";
 import { StubTachyonRouter } from "./tachyon";
-import { handleWebDav } from "./webdav";
+import { handleWebDav, watchWebDavRoot } from "./webdav";
 import { attachWebSocketBridge } from "./websocket";
 
 export async function startNebulaCli(): Promise<https.Server> {
@@ -16,6 +16,8 @@ export async function startNebulaCli(): Promise<https.Server> {
   });
 
   attachWebSocketBridge(server, router);
+  const watcher = watchWebDavRoot(config.docsRoot, router);
+  server.on("close", () => watcher.close());
 
   await new Promise<void>((resolve) => {
     server.listen(config.port, config.host, resolve);

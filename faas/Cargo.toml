@@ -7,7 +7,9 @@ members = [
   "nebula-curriculum-generator",
   "nebula-teacher-arbitrator",
   "nebula-dataset-forge",
-  "nebula-training-orchestrator"
+  "nebula-training-orchestrator",
+  "nebula-doc-parser",
+  "nebula-semantic-chunker"
 ]
 resolver = "2"
 
