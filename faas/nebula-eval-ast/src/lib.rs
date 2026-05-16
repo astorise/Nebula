@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tree_sitter::Parser;
 
 pub const RESULTS_TOPIC: &str = "nebula.eval.results";
 pub const SEMANTIC_FALLBACK_TOPIC: &str = "nebula.eval.semantic.pending";
@@ -92,7 +91,6 @@ pub fn structural_hashes(responses: &[String; 3]) -> Result<[String; 3]> {
 
 pub fn structural_hash(response: &str) -> Result<String> {
     let code = extract_code_block(response).ok_or_else(|| anyhow!("no code block found"))?;
-    let _parser = Parser::new();
     let features = structural_features(code);
 
     if features.is_empty() {
