@@ -1,0 +1,5 @@
+- [x] `task-1` : Ajouter les workspaces Rust `nebula-curriculum-generator`, `nebula-teacher-arbitrator`, `nebula-dataset-forge` et `nebula-training-orchestrator` dans `faas/`.
+- [x] `task-2` : Implémenter le générateur de curriculum avec schéma JSON et injection des tâches corrélées vers Tachyon.
+- [x] `task-3` : Implémenter l'arbitrator Tier 3 avec micro-batching, orchestration layer-by-layer et décodage JSON contraint.
+- [x] `task-4` : Implémenter le dataset forge avec ratio 60/40, persistance JSONL append-only et signal `nebula.training.ready`.
+- [x] `task-5` : Implémenter l'orchestrator LoRA avec entraînement, fusion, publication OCI via `wkg` et notification UI.

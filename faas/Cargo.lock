@@ -106,6 +106,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8ca58f447f06ed17d5fc4043ce1b10dd205e060fb3ce5b979b8ed8e59ff3f79"
 
 [[package]]
+name = "nebula-curriculum-generator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nebula-dataset-forge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nebula-divergence-aggregator"
 version = "0.1.0"
 dependencies = [
@@ -135,7 +153,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "nebula-teacher-arbitrator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nebula-telemetry-gateway"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nebula-training-orchestrator"
 version = "0.1.0"
 dependencies = [
  "anyhow",

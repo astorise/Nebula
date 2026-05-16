@@ -3,7 +3,11 @@ members = [
   "nebula-telemetry-gateway",
   "nebula-eval-ast",
   "nebula-eval-semantic",
-  "nebula-divergence-aggregator"
+  "nebula-divergence-aggregator",
+  "nebula-curriculum-generator",
+  "nebula-teacher-arbitrator",
+  "nebula-dataset-forge",
+  "nebula-training-orchestrator"
 ]
 resolver = "2"
 
