@@ -45,12 +45,26 @@ export interface FederationState {
   contributions: FederationContribution[];
 }
 
+export interface ArtifactVariant {
+  title: string;
+  artifact: string;
+  sizeBytes: number;
+  minVramGb: number;
+}
+
+export interface DeploymentArtifacts {
+  hostVramGb: number;
+  maxVariant?: string;
+  variants: ArtifactVariant[];
+}
+
 export interface DashboardState {
   connectionStatus: string;
   dataset: DatasetState;
   trainingStatus: TrainingStatus;
   validation?: ValidationResult;
   deploymentStatus?: string;
+  deploymentArtifacts: DeploymentArtifacts;
   federation: FederationState;
   logs: string[];
 }
@@ -64,7 +78,8 @@ export type WebviewToExtensionMessage =
   | { type: "COMMAND"; action: "curriculum.generate"; payload: CurriculumCommand }
   | { type: "COMMAND"; action: "training.forceMerge"; payload: Record<string, never> }
   | { type: "COMMAND"; action: "DEPLOY_LORA"; payload: { artifact: string } }
-  | { type: "COMMAND"; action: "federation.sync.setPaused"; payload: { paused: boolean } };
+  | { type: "COMMAND"; action: "federation.sync.setPaused"; payload: { paused: boolean } }
+  | { type: "COMMAND"; action: "deployment.variant.setMax"; payload: { maxVariant: string } };
 
 export type ExtensionToWebviewMessage =
   | { type: "STATE"; payload: DashboardState }

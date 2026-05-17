@@ -12,7 +12,8 @@ members = [
   "nebula-semantic-chunker",
   "nebula-lora-validator",
   "nebula-p2p-sync-agent",
-  "nebula-crdt-merger"
+  "nebula-crdt-merger",
+  "nebula-quantization-engine"
 ]
 resolver = "2"
 

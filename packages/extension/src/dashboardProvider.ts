@@ -22,6 +22,10 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       direct: 0
     },
     trainingStatus: "waiting",
+    deploymentArtifacts: {
+      hostVramGb: 8,
+      variants: []
+    },
     federation: {
       paused: false,
       peers: [],
@@ -68,6 +72,7 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       this.socket.on("open", () => {
         this.setConnectionStatus("connected");
         this.sendCommand("dashboard.ready", {});
+        this.sendCommand("deployment.artifacts.list", {});
       });
 
       this.socket.on("message", (raw) => {
@@ -112,6 +117,13 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       this.sendCommand("federation.sync.setPaused", message.payload);
       this.state.federation.paused = message.payload.paused;
       this.appendLog(`Federated sync ${message.payload.paused ? "paused" : "resumed"}`);
+      this.postState();
+    }
+
+    if (message.action === "deployment.variant.setMax") {
+      this.sendCommand("deployment.variant.setMax", message.payload);
+      this.state.deploymentArtifacts.maxVariant = message.payload.maxVariant;
+      this.appendLog(`Deployment variant ceiling set to ${message.payload.maxVariant}`);
       this.postState();
     }
   }
@@ -168,6 +180,32 @@ export class NebulaDashboardProvider implements vscode.Disposable {
     if (envelope.action === "nebula.deployment.started") {
       const payload = envelope.payload as Partial<{ artifact: string; status: string }>;
       this.state.deploymentStatus = `${payload.status ?? "deploying"}: ${payload.artifact ?? "unknown artifact"}`;
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.quantization.completed") {
+      const payload = envelope.payload as Partial<{ variants: unknown[] }>;
+      this.state.deploymentArtifacts.variants = normalizeArtifactVariants(payload.variants);
+      this.appendLog("Quantization complete: deployment variants updated");
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.deployment.artifacts") {
+      const payload = envelope.payload as Partial<{ hostVramGb: number; variants: unknown[] }>;
+      this.state.deploymentArtifacts = {
+        ...this.state.deploymentArtifacts,
+        hostVramGb: typeof payload.hostVramGb === "number" ? payload.hostVramGb : this.state.deploymentArtifacts.hostVramGb,
+        variants: normalizeArtifactVariants(payload.variants)
+      };
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.deployment.variant_ceiling") {
+      const payload = envelope.payload as Partial<{ maxVariant: string }>;
+      this.state.deploymentArtifacts.maxVariant = payload.maxVariant;
       this.postState();
       return;
     }
@@ -279,4 +317,20 @@ function normalizeValidationResult(payload: unknown): ValidationResult {
     pass_rate: typeof result.pass_rate === "number" ? result.pass_rate : 0,
     samples: Array.isArray(result.samples) ? result.samples : []
   };
+}
+
+function normalizeArtifactVariants(payload: unknown): DashboardState["deploymentArtifacts"]["variants"] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.map((item) => {
+    const variant = item as Partial<{ title: string; artifact: string; artifact_ref: string; sizeBytes: number; size_bytes: number; minVramGb: number; min_vram_gb: number }>;
+    return {
+      title: typeof variant.title === "string" ? variant.title : "unknown",
+      artifact: typeof variant.artifact === "string" ? variant.artifact : typeof variant.artifact_ref === "string" ? variant.artifact_ref : "",
+      sizeBytes: typeof variant.sizeBytes === "number" ? variant.sizeBytes : typeof variant.size_bytes === "number" ? variant.size_bytes : 0,
+      minVramGb: typeof variant.minVramGb === "number" ? variant.minVramGb : typeof variant.min_vram_gb === "number" ? variant.min_vram_gb : 0
+    };
+  });
 }

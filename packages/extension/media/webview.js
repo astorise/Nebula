@@ -18,6 +18,10 @@
           direct: 0
         },
         trainingStatus: "waiting",
+        deploymentArtifacts: {
+          hostVramGb: 8,
+          variants: []
+        },
         federation: {
           paused: false,
           peers: [],
@@ -127,6 +131,7 @@
                   </div>
                 </div>
                 <p class="muted">${escapeHtml(state.deploymentStatus ?? validation.output_model)}</p>
+                ${artifactTable()}
               ` : `<p class="muted">Waiting for LoRA validation results</p>`}
         </article>
         <article>
@@ -184,6 +189,14 @@
             payload: { paused: !state.federation.paused }
           });
         });
+        document.getElementById("maxVariant")?.addEventListener("change", (event) => {
+          const maxVariant = event.target.value;
+          vscode.postMessage({
+            type: "COMMAND",
+            action: "deployment.variant.setMax",
+            payload: { maxVariant }
+          });
+        });
       }
       function step(value, label) {
         const current = ["waiting", "backward", "merge", "published"].indexOf(state.trainingStatus);
@@ -192,6 +205,63 @@
       }
       function escapeHtml(value) {
         return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
+      }
+      function artifactTable() {
+        const variants = state.deploymentArtifacts.variants;
+        if (variants.length === 0) {
+          return `<p class="muted">Waiting for quantized artifact metadata</p>`;
+        }
+        return `
+    <div class="artifactTools">
+      <label>
+        Max variant
+        <select id="maxVariant">
+          ${variants.map(
+          (variant) => `<option value="${escapeHtml(variant.title)}" ${state.deploymentArtifacts.maxVariant === variant.title ? "selected" : ""}>${escapeHtml(variant.title)}</option>`
+        ).join("")}
+        </select>
+      </label>
+    </div>
+    <table>
+      <thead>
+        <tr><th>Variant</th><th>Size</th><th>Min VRAM</th><th>Safety</th></tr>
+      </thead>
+      <tbody>
+        ${variants.map(
+          (variant) => `
+              <tr>
+                <td>${escapeHtml(variant.title)}</td>
+                <td>${formatBytes(variant.sizeBytes)}</td>
+                <td>${variant.minVramGb}GB</td>
+                <td><span class="safety ${safetyClass(variant.minVramGb)}">${safetyLabel(variant.minVramGb)}</span></td>
+              </tr>
+            `
+        ).join("")}
+      </tbody>
+    </table>
+  `;
+      }
+      function formatBytes(bytes) {
+        if (bytes >= 1e9) {
+          return `${(bytes / 1e9).toFixed(1)}GB`;
+        }
+        if (bytes >= 1e6) {
+          return `${(bytes / 1e6).toFixed(1)}MB`;
+        }
+        return `${bytes}B`;
+      }
+      function safetyLabel(minVramGb) {
+        const available = state.deploymentArtifacts.hostVramGb;
+        if (available >= minVramGb + 4) {
+          return "Green";
+        }
+        if (available >= minVramGb) {
+          return "Yellow";
+        }
+        return "Red";
+      }
+      function safetyClass(minVramGb) {
+        return safetyLabel(minVramGb).toLowerCase();
       }
       var style = document.createElement("style");
       style.textContent = `
@@ -219,6 +289,7 @@
   form { display: grid; gap: 10px; }
   label { display: grid; gap: 4px; }
   input { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 8px; }
+  select { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 8px; }
   button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: 0; padding: 9px 12px; cursor: pointer; }
   .diff { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
   .peers { display: grid; gap: 8px; }
@@ -226,6 +297,14 @@
   .peer span { overflow-wrap: anywhere; }
   pre { margin: 0; min-height: 120px; max-height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: var(--vscode-input-background); border: 1px solid var(--vscode-panel-border); padding: 10px; font-family: var(--vscode-editor-font-family); font-size: 12px; }
   .muted { color: var(--vscode-descriptionForeground); }
+  .artifactTools { display: flex; justify-content: flex-end; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { border: 1px solid var(--vscode-panel-border); padding: 8px; text-align: left; }
+  th { color: var(--vscode-descriptionForeground); font-weight: 600; }
+  .safety { display: inline-block; min-width: 54px; text-align: center; padding: 3px 6px; }
+  .green { background: var(--vscode-charts-green); color: var(--vscode-editor-background); }
+  .yellow { background: var(--vscode-charts-yellow); color: var(--vscode-editor-background); }
+  .red { background: var(--vscode-charts-red); color: var(--vscode-editor-background); }
   .logs { display: grid; gap: 6px; max-height: 260px; overflow: auto; }
   .logs p { font-family: var(--vscode-editor-font-family); font-size: 12px; padding: 6px; background: var(--vscode-input-background); }
 `;

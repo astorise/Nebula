@@ -649,6 +649,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nebula-quantization-engine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "nebula-semantic-chunker"
 version = "0.1.0"
 dependencies = [
