@@ -1,6 +1,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
+pub const CARGO_COMPONENT_BUILD_ARGS: &[&str] =
+    &["component", "build", "--release", "--message-format=json"];
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct BuildToolRequest {
     pub src_lib_rs: String,
@@ -25,10 +28,7 @@ pub fn build_tool(
     request: BuildToolRequest,
 ) -> Result<BuildToolResponse> {
     let diagnostics = runner.build_component(&request)?;
-    if diagnostics
-        .iter()
-        .any(|line| line.to_ascii_lowercase().contains("error"))
-    {
+    if cargo_diagnostics_have_error(&diagnostics) {
         return Ok(BuildToolResponse {
             artifact_ref: None,
             diagnostics,
@@ -44,6 +44,19 @@ pub fn build_tool(
     })
 }
 
+pub fn cargo_diagnostics_have_error(lines: &[String]) -> bool {
+    lines.iter().any(|line| {
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(line) else {
+            return false;
+        };
+        value
+            .get("message")
+            .and_then(|message| message.get("level"))
+            .and_then(serde_json::Value::as_str)
+            == Some("error")
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -52,7 +65,11 @@ mod tests {
 
     impl FoundryRunner for Runner {
         fn build_component(&mut self, _request: &BuildToolRequest) -> Result<Vec<String>> {
-            Ok(vec!["finished release wasm32-wasip1".into()])
+            Ok(vec![serde_json::json!({
+                "reason": "compiler-message",
+                "message": { "level": "warning", "message": "contains word error in warning text" }
+            })
+            .to_string()])
         }
 
         fn push_artifact(&mut self, artifact_ref: &str) -> Result<String> {
@@ -77,5 +94,13 @@ mod tests {
             response.artifact_ref.unwrap(),
             "oci://localhost:5000/tools/lookup:v1"
         );
+    }
+
+    #[test]
+    fn detects_only_structured_cargo_errors() {
+        assert!(!cargo_diagnostics_have_error(&["plain text error".into()]));
+        assert!(cargo_diagnostics_have_error(&[
+            serde_json::json!({ "message": { "level": "error" } }).to_string()
+        ]));
     }
 }

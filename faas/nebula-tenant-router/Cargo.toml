@@ -8,3 +8,9 @@ license.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+uuid.workspace = true
+nebula-tenant-core = { path = "../nebula-tenant-core" }
+
+[dev-dependencies]
+nebula-dataset-forge = { path = "../nebula-dataset-forge" }
+nebula-golden-dataset-manager = { path = "../nebula-golden-dataset-manager" }

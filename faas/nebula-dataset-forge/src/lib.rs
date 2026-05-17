@@ -1,6 +1,8 @@
 use anyhow::Result;
+use nebula_tenant_core::{tenant_dataset_path as core_tenant_dataset_path, TenantRegistry};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use uuid::Uuid;
 
 pub const DATASET_FILE: &str = "dataset_v1.jsonl";
 pub const PREFERENCE_DATASET_FILE: &str = "preference_v1.jsonl";
@@ -175,42 +177,34 @@ pub fn dataset_index_key(prompt: &str) -> String {
 }
 
 pub fn tenant_dataset_path(tenant_id: &str) -> String {
-    format!(
-        "{TENANT_DATASET_PREFIX}/{}/{}",
-        sanitize_tenant_id(tenant_id),
-        DATASET_FILE
-    )
+    core_tenant_dataset_path(resolve_path_tenant(tenant_id), DATASET_FILE)
 }
 
 pub fn tenant_preference_dataset_path(tenant_id: &str) -> String {
-    format!(
-        "{TENANT_DATASET_PREFIX}/{}/{}",
-        sanitize_tenant_id(tenant_id),
-        PREFERENCE_DATASET_FILE
-    )
+    core_tenant_dataset_path(resolve_path_tenant(tenant_id), PREFERENCE_DATASET_FILE)
 }
 
 pub fn tenant_tool_dataset_path(tenant_id: &str) -> String {
-    format!(
-        "{TENANT_DATASET_PREFIX}/{}/{}",
-        sanitize_tenant_id(tenant_id),
-        TOOL_DATASET_FILE
-    )
+    core_tenant_dataset_path(resolve_path_tenant(tenant_id), TOOL_DATASET_FILE)
 }
 
 pub fn tenant_golden_dataset_path(tenant_id: &str) -> String {
-    format!(
-        "{TENANT_DATASET_PREFIX}/{}/{}",
-        sanitize_tenant_id(tenant_id),
-        GOLDEN_DATASET_FILE
-    )
+    core_tenant_dataset_path(resolve_path_tenant(tenant_id), GOLDEN_DATASET_FILE)
+}
+
+pub fn tenant_dataset_path_with_registry(
+    raw_tenant_id: &str,
+    registry: &impl TenantRegistry,
+) -> Result<String> {
+    let tenant_id = nebula_tenant_core::resolve_tenant(raw_tenant_id, registry)?;
+    Ok(core_tenant_dataset_path(tenant_id, DATASET_FILE))
 }
 
 pub fn tenant_index_key(tenant_id: &str, prompt: &str) -> String {
     let digest = Sha256::digest(prompt.as_bytes());
     format!(
         "tenant:{}:dataset:index:{}",
-        sanitize_tenant_id(tenant_id),
+        resolve_path_tenant(tenant_id),
         hex(&digest)
     )
 }
@@ -251,17 +245,9 @@ pub fn mix_with_golden(
     batch
 }
 
-fn sanitize_tenant_id(tenant_id: &str) -> String {
-    tenant_id
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
-                ch
-            } else {
-                '_'
-            }
-        })
-        .collect()
+fn resolve_path_tenant(tenant_id: &str) -> Uuid {
+    Uuid::parse_str(tenant_id)
+        .unwrap_or_else(|_| nebula_tenant_core::deterministic_test_tenant(tenant_id))
 }
 
 fn ratio_allows(counters: DatasetCounters, source: &ExampleSource) -> bool {
@@ -391,7 +377,10 @@ mod tests {
     fn builds_tenant_paths_and_mixes_replay_rows() {
         assert_eq!(
             tenant_dataset_path("acme/prod"),
-            "/mnt/forge/tenants/acme_prod/dataset_v1.jsonl"
+            format!(
+                "/mnt/forge/tenants/{}/dataset_v1.jsonl",
+                nebula_tenant_core::deterministic_test_tenant("acme/prod")
+            )
         );
 
         let live = vec![TrainingExample {

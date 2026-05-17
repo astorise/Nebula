@@ -767,6 +767,7 @@ function safetyClass(minVramGb: number): string {
 }
 
 const style = document.createElement("style");
+style.nonce = root?.dataset.styleNonce ?? "";
 style.textContent = `
   body { margin: 0; color: var(--vscode-foreground); background: var(--vscode-editor-background); font-family: var(--vscode-font-family); }
   main { padding: 20px; display: grid; gap: 16px; max-width: 1080px; }

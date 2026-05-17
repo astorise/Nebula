@@ -17,13 +17,24 @@ pub struct GeneratedTool {
     pub cargo_toml: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GeneratedToolPayload {
+    pub files: Vec<GeneratedToolFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GeneratedToolFile {
+    pub name: String,
+    pub content: String,
+}
+
 pub trait Tier3Model {
     fn generate_tool(&self, prompt: &str) -> Result<String>;
 }
 
 pub fn build_tool_prompt(event: &MissingToolEvent) -> String {
     format!(
-        "Generate a Rust Wasm component for capability '{}'.\nWIT context:\n{}\nUser need:\n{}",
+        "Generate a Rust Wasm component for capability '{}'. Return strict JSON only using schema {{\"files\":[{{\"name\":\"src/lib.rs\",\"content\":\"...\"}},{{\"name\":\"Cargo.toml\",\"content\":\"...\"}}]}}.\nWIT context:\n{}\nUser need:\n{}",
         event.capability, event.wit_context, event.prompt
     )
 }
@@ -34,8 +45,9 @@ pub fn architect_tool(model: &impl Tier3Model, event: &MissingToolEvent) -> Resu
 }
 
 pub fn extract_generated_tool(name: &str, response: &str) -> Result<GeneratedTool> {
-    let lib_rs = extract_block(response, "src/lib.rs")?;
-    let cargo_toml = extract_block(response, "Cargo.toml")?;
+    let payload = serde_json::from_str::<GeneratedToolPayload>(response)?;
+    let lib_rs = file_content(&payload, "src/lib.rs")?;
+    let cargo_toml = file_content(&payload, "Cargo.toml")?;
     Ok(GeneratedTool {
         name: name.into(),
         lib_rs,
@@ -43,21 +55,13 @@ pub fn extract_generated_tool(name: &str, response: &str) -> Result<GeneratedToo
     })
 }
 
-fn extract_block(response: &str, marker: &str) -> Result<String> {
-    let start = response
-        .find(marker)
-        .ok_or_else(|| anyhow::anyhow!("missing {marker} block"))?;
-    let rest = &response[start + marker.len()..];
-    let fence = rest
-        .find("```")
-        .ok_or_else(|| anyhow::anyhow!("missing opening fence for {marker}"))?;
-    let after_fence = &rest[fence + 3..];
-    let newline = after_fence.find('\n').unwrap_or(0);
-    let body = &after_fence[newline..];
-    let end = body
-        .find("```")
-        .ok_or_else(|| anyhow::anyhow!("missing closing fence for {marker}"))?;
-    Ok(body[..end].trim().into())
+fn file_content(payload: &GeneratedToolPayload, name: &str) -> Result<String> {
+    payload
+        .files
+        .iter()
+        .find(|file| file.name == name)
+        .map(|file| file.content.clone())
+        .ok_or_else(|| anyhow::anyhow!("missing generated file {name}"))
 }
 
 #[cfg(test)]
@@ -68,7 +72,13 @@ mod tests {
 
     impl Tier3Model for Model {
         fn generate_tool(&self, _prompt: &str) -> Result<String> {
-            Ok("src/lib.rs\n```rust\npub fn run() {}\n```\nCargo.toml\n```toml\n[package]\nname=\"tool\"\n```".into())
+            Ok(serde_json::json!({
+                "files": [
+                    { "name": "src/lib.rs", "content": "pub fn run() {}" },
+                    { "name": "Cargo.toml", "content": "[package]\nname=\"tool\"" }
+                ]
+            })
+            .to_string())
         }
     }
 

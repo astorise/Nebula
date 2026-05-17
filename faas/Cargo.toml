@@ -22,7 +22,8 @@ members = [
   "nebula-golden-dataset-manager",
   "nebula-tool-architect",
   "nebula-tool-gap-analyzer",
-  "nebula-wasm-foundry"
+  "nebula-wasm-foundry",
+  "nebula-tenant-core"
 ]
 resolver = "2"
 
@@ -37,6 +38,8 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 regex = "1.10"
 sha2 = "0.10"
+uuid = { version = "1.8", features = ["serde", "v5"] }
+ts-rs = "10.0"
 prost = "0.13"
 tokio = { version = "1.41", features = ["macros", "net", "rt-multi-thread", "signal"] }
 tokio-stream = { version = "0.1", features = ["net"] }

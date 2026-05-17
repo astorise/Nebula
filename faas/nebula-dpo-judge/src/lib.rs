@@ -1,5 +1,7 @@
 use anyhow::Result;
+use regex::RegexSet;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ConstitutionRule {
@@ -33,6 +35,9 @@ pub trait ConstitutionStore {
 
 pub trait PreferenceSink {
     fn write_preference(&mut self, pair: PreferencePair) -> Result<()>;
+    fn append_audit_hash(&mut self, _hash: &str) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub fn build_teacher_prompt(prompt: &str, rules: &[ConstitutionRule]) -> String {
@@ -50,14 +55,9 @@ pub fn judge_and_forward(
     request: DpoJudgementRequest,
 ) -> Result<PreferencePair> {
     let rules = store.load_rules(request.tenant_id.as_deref())?;
-    for rule in &rules {
-        for forbidden in &rule.forbidden_terms {
-            anyhow::ensure!(
-                !request.tier3_answer.contains(forbidden),
-                "chosen answer violates constitution rule {}",
-                rule.id
-            );
-        }
+    let pattern_set = compile_forbidden_patterns(&rules)?;
+    if pattern_set.is_match(&request.tier3_answer) {
+        anyhow::bail!("chosen answer violates constitution");
     }
 
     let pair = PreferencePair {
@@ -66,8 +66,40 @@ pub fn judge_and_forward(
         rejected: request.tier1_answer,
         tenant_id: request.tenant_id,
     };
+    let audit_hash = preference_audit_hash(&pair);
     sink.write_preference(pair.clone())?;
+    sink.append_audit_hash(&audit_hash)?;
     Ok(pair)
+}
+
+pub fn compile_forbidden_patterns(rules: &[ConstitutionRule]) -> Result<RegexSet> {
+    let patterns = rules
+        .iter()
+        .flat_map(|rule| rule.forbidden_terms.iter())
+        .map(|term| {
+            let identifier = term
+                .chars()
+                .filter(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+                .collect::<String>();
+            let needle = if identifier.is_empty() {
+                term.as_str()
+            } else {
+                identifier.as_str()
+            };
+            format!(r"(?i)\b{}\b", regex::escape(needle))
+        })
+        .collect::<Vec<_>>();
+    Ok(RegexSet::new(patterns)?)
+}
+
+pub fn preference_audit_hash(pair: &PreferencePair) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(pair.prompt.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(pair.chosen.as_bytes());
+    hasher.update(b"\0");
+    hasher.update(pair.rejected.as_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 #[cfg(test)]
@@ -92,6 +124,11 @@ mod tests {
             self.0.push(pair);
             Ok(())
         }
+
+        fn append_audit_hash(&mut self, hash: &str) -> Result<()> {
+            assert_eq!(hash.len(), 64);
+            Ok(())
+        }
     }
 
     #[test]
@@ -111,5 +148,18 @@ mod tests {
 
         assert!(pair.prompt.contains("Do not use unwrap"));
         assert_eq!(sink.0.len(), 1);
+    }
+
+    #[test]
+    fn rejects_case_variants_without_matching_identifiers() {
+        let rules = vec![ConstitutionRule {
+            id: "rust-safety".into(),
+            instruction: "Do not use unwrap.".into(),
+            forbidden_terms: vec!["unwrap".into()],
+        }];
+        let set = compile_forbidden_patterns(&rules).unwrap();
+
+        assert!(set.is_match("value.Unwrap()"));
+        assert!(!set.is_match("unwrap_internal_macro"));
     }
 }
