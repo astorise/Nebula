@@ -1,8 +1,10 @@
 use anyhow::Result;
-use nebula_tenant_core::{tenant_dataset_path as core_tenant_dataset_path, TenantRegistry};
+use nebula_tenant_core::{
+    tenant_dataset_path as core_tenant_dataset_path, tenant_dataset_path_with_prefix, TenantId,
+    TenantRegistry,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use uuid::Uuid;
 
 pub const DATASET_FILE: &str = "dataset_v1.jsonl";
 pub const PREFERENCE_DATASET_FILE: &str = "preference_v1.jsonl";
@@ -10,7 +12,6 @@ pub const TOOL_DATASET_FILE: &str = "tool_calls_v1.jsonl";
 pub const GOLDEN_DATASET_FILE: &str = "golden_v1.jsonl";
 pub const TRAINING_READY_TOPIC: &str = "nebula.training.ready";
 pub const DATASET_INDEX_PREFIX: &str = "nebula.dataset.index";
-pub const TENANT_DATASET_PREFIX: &str = "/mnt/forge/tenants";
 pub const TENANT_ROW_QUOTA: usize = 50_000;
 pub const ESCALATED_TARGET: f32 = 0.60;
 pub const DIRECT_TARGET: f32 = 0.40;
@@ -177,19 +178,22 @@ pub fn dataset_index_key(prompt: &str) -> String {
 }
 
 pub fn tenant_dataset_path(tenant_id: &str) -> String {
-    core_tenant_dataset_path(resolve_path_tenant(tenant_id), DATASET_FILE)
+    tenant_dataset_path_checked(tenant_id, DATASET_FILE).expect("tenant id must be a valid UUID")
 }
 
 pub fn tenant_preference_dataset_path(tenant_id: &str) -> String {
-    core_tenant_dataset_path(resolve_path_tenant(tenant_id), PREFERENCE_DATASET_FILE)
+    tenant_dataset_path_checked(tenant_id, PREFERENCE_DATASET_FILE)
+        .expect("tenant id must be a valid UUID")
 }
 
 pub fn tenant_tool_dataset_path(tenant_id: &str) -> String {
-    core_tenant_dataset_path(resolve_path_tenant(tenant_id), TOOL_DATASET_FILE)
+    tenant_dataset_path_checked(tenant_id, TOOL_DATASET_FILE)
+        .expect("tenant id must be a valid UUID")
 }
 
 pub fn tenant_golden_dataset_path(tenant_id: &str) -> String {
-    core_tenant_dataset_path(resolve_path_tenant(tenant_id), GOLDEN_DATASET_FILE)
+    tenant_dataset_path_checked(tenant_id, GOLDEN_DATASET_FILE)
+        .expect("tenant id must be a valid UUID")
 }
 
 pub fn tenant_dataset_path_with_registry(
@@ -200,11 +204,22 @@ pub fn tenant_dataset_path_with_registry(
     Ok(core_tenant_dataset_path(tenant_id, DATASET_FILE))
 }
 
+pub fn tenant_dataset_path_with_prefix_checked(
+    tenant_id: &str,
+    prefix: &str,
+    file_name: &str,
+) -> Result<String> {
+    let tenant_id = parse_tenant_id(tenant_id)?;
+    Ok(tenant_dataset_path_with_prefix(
+        tenant_id, prefix, file_name,
+    ))
+}
+
 pub fn tenant_index_key(tenant_id: &str, prompt: &str) -> String {
     let digest = Sha256::digest(prompt.as_bytes());
     format!(
         "tenant:{}:dataset:index:{}",
-        resolve_path_tenant(tenant_id),
+        parse_tenant_id(tenant_id).expect("tenant id must be a valid UUID"),
         hex(&digest)
     )
 }
@@ -245,9 +260,15 @@ pub fn mix_with_golden(
     batch
 }
 
-fn resolve_path_tenant(tenant_id: &str) -> Uuid {
-    Uuid::parse_str(tenant_id)
-        .unwrap_or_else(|_| nebula_tenant_core::deterministic_test_tenant(tenant_id))
+fn tenant_dataset_path_checked(tenant_id: &str, file_name: &str) -> Result<String> {
+    Ok(core_tenant_dataset_path(
+        parse_tenant_id(tenant_id)?,
+        file_name,
+    ))
+}
+
+fn parse_tenant_id(tenant_id: &str) -> Result<TenantId> {
+    Ok(TenantId(uuid::Uuid::parse_str(tenant_id)?))
 }
 
 fn ratio_allows(counters: DatasetCounters, source: &ExampleSource) -> bool {
@@ -363,7 +384,7 @@ mod tests {
                 prompt: "p".into(),
                 chosen: "safe".into(),
                 rejected: "unsafe".into(),
-                tenant_id: Some("acme".into()),
+                tenant_id: Some(nebula_tenant_core::deterministic_test_tenant("acme").to_string()),
                 context: serde_json::json!({}),
             },
         )
@@ -374,9 +395,16 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "tenant id must be a valid UUID")]
+    fn tenant_path_rejects_unresolved_tenant_strings() {
+        let _ = tenant_dataset_path("acme/prod");
+    }
+
+    #[test]
     fn builds_tenant_paths_and_mixes_replay_rows() {
+        let tenant_id = nebula_tenant_core::deterministic_test_tenant("acme/prod").to_string();
         assert_eq!(
-            tenant_dataset_path("acme/prod"),
+            tenant_dataset_path(&tenant_id),
             format!(
                 "/mnt/forge/tenants/{}/dataset_v1.jsonl",
                 nebula_tenant_core::deterministic_test_tenant("acme/prod")

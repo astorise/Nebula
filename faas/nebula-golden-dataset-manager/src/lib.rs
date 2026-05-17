@@ -27,6 +27,12 @@ pub trait GoldenStore {
     fn vectorize(&mut self, namespace: &str, row: &GoldenRow) -> Result<()>;
 }
 
+/// Promotes a row into the golden dataset only after the caller has proven it
+/// survived production for more than seven full days without rollback or drift.
+///
+/// `days_in_production` is not measured by this crate. The caller owns the
+/// durable temporal evidence, such as deployment metadata or canary history,
+/// and passes the already-computed day count into this function.
 pub fn promote_if_stable(
     store: &mut impl GoldenStore,
     candidate: CandidateRow,

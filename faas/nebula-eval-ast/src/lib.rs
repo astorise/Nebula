@@ -1,12 +1,14 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+#[cfg(not(target_arch = "wasm32"))]
 use tree_sitter::Parser;
 
 pub const RESULTS_TOPIC: &str = "nebula.eval.results";
 pub const SEMANTIC_FALLBACK_TOPIC: &str = "nebula.eval.semantic.pending";
 pub const DEFAULT_SOCKET_PATH: &str = "/run/guest.sock";
 
+#[cfg(not(target_arch = "wasm32"))]
 pub mod proto {
     tonic::include_proto!("nebula.ast");
 }
@@ -97,6 +99,7 @@ pub fn structural_hashes(responses: &[String; 3]) -> Result<[String; 3]> {
 
 pub fn structural_hash(response: &str) -> Result<String> {
     let code = extract_code_block(response).ok_or_else(|| anyhow!("no code block found"))?;
+    #[cfg(not(target_arch = "wasm32"))]
     let _parser = Parser::new();
     let features = structural_features(code);
 
@@ -109,6 +112,7 @@ pub fn structural_hash(response: &str) -> Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub fn evaluate_proto_request(request: proto::EvaluationRequest) -> proto::EvaluationResponse {
     let responses = match <[String; 3]>::try_from(request.responses) {
         Ok(responses) => responses,

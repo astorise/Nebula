@@ -64,14 +64,33 @@ jobs:
         with:
           tool: cargo-component
 
+      - name: Install Cargo security tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit,cargo-deny
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
       - name: Clippy
         run: cargo clippy --workspace -- -D warnings
 
+      - name: Audit dependencies
+        run: cargo audit --deny warnings
+
+      - name: Check dependency policy
+        run: cargo deny check
+
       - name: Clippy Wasm components
-        run: cargo clippy --workspace --exclude nebula-eval-ast --target wasm32-wasip1 -- -D warnings
+        run: >
+          cargo clippy
+          -p nebula-eval-ast
+          -p nebula-dataset-forge
+          -p nebula-economic-governor
+          -p nebula-semantic-deduplicator
+          -p nebula-tenant-router
+          --target wasm32-wasip1
+          -- -D warnings
 
       - name: Test
         run: cargo test --workspace

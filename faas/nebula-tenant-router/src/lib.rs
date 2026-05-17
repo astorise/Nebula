@@ -1,8 +1,7 @@
 use anyhow::Result;
-use nebula_tenant_core::{deterministic_test_tenant, resolve_tenant, TenantRegistry};
+use nebula_tenant_core::{deterministic_test_tenant, resolve_tenant, TenantId, TenantRegistry};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use uuid::Uuid;
 
 pub const INPUT_TOPIC: &str = "pulsar.telemetry.inference_triplets";
 pub const OUTPUT_TOPIC: &str = "nebula.tenant.routed_triplets";
@@ -30,7 +29,7 @@ pub struct TelemetryTriplet {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TenantRoutedTriplet {
-    pub tenant_id: Uuid,
+    pub tenant_id: TenantId,
     pub payload: TelemetryTriplet,
 }
 
@@ -52,32 +51,29 @@ pub fn route_tenant_triplet_with_registry(
         .filter(|value| !value.trim().is_empty())
         .cloned();
 
-    if tenant.is_none() || config.require_registered_tenant {
-        let Some(raw_tenant) = tenant else {
-            return Ok(None);
-        };
+    let Some(raw_tenant) = tenant else {
+        return Ok(None);
+    };
 
-        let tenant_id = match resolve_tenant(&raw_tenant, registry) {
-            Ok(tenant_id) => tenant_id,
-            Err(_) => return Ok(None),
-        };
-        return Ok(Some(TenantRoutedTriplet {
-            tenant_id,
-            payload: triplet,
-        }));
-    }
-
-    Ok(None)
+    let tenant_id = match resolve_tenant(&raw_tenant, registry) {
+        Ok(tenant_id) => tenant_id,
+        Err(_) if !config.require_registered_tenant => deterministic_test_tenant("default"),
+        Err(_) => return Ok(None),
+    };
+    Ok(Some(TenantRoutedTriplet {
+        tenant_id,
+        payload: triplet,
+    }))
 }
 
 struct StaticRegistry;
 
 impl TenantRegistry for StaticRegistry {
-    fn lookup_tenant_uuid(&self, raw_id: &str) -> Result<Option<Uuid>> {
-        Ok((raw_id == "default" || raw_id == "acme").then(|| deterministic_test_tenant(raw_id)))
+    fn lookup_tenant_uuid(&self, raw_id: &str) -> Result<Option<uuid::Uuid>> {
+        Ok((raw_id == "default" || raw_id == "acme").then(|| deterministic_test_tenant(raw_id).0))
     }
 
-    fn tenant_row_count(&self, _tenant_id: Uuid) -> Result<usize> {
+    fn tenant_row_count(&self, _tenant_id: TenantId) -> Result<usize> {
         Ok(0)
     }
 }
@@ -90,11 +86,11 @@ mod tests {
     struct Registry;
 
     impl TenantRegistry for Registry {
-        fn lookup_tenant_uuid(&self, raw_id: &str) -> Result<Option<Uuid>> {
-            Ok((raw_id == "acme").then(|| deterministic_test_tenant(raw_id)))
+        fn lookup_tenant_uuid(&self, raw_id: &str) -> Result<Option<uuid::Uuid>> {
+            Ok((raw_id == "acme").then(|| deterministic_test_tenant(raw_id).0))
         }
 
-        fn tenant_row_count(&self, _tenant_id: Uuid) -> Result<usize> {
+        fn tenant_row_count(&self, _tenant_id: TenantId) -> Result<usize> {
             Ok(0)
         }
     }
@@ -134,5 +130,26 @@ mod tests {
         .unwrap();
 
         assert!(routed.is_none());
+    }
+
+    #[test]
+    fn permissive_mode_falls_back_to_default_tenant() {
+        let mut context = BTreeMap::new();
+        context.insert("x-tenant-id".into(), "unregistered".into());
+        let routed = route_tenant_triplet_with_registry(
+            TelemetryTriplet {
+                prompt: "p".into(),
+                answer: "a".into(),
+                context,
+            },
+            &TenantRouterConfig {
+                require_registered_tenant: false,
+            },
+            &Registry,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(routed.tenant_id, deterministic_test_tenant("default"));
     }
 }

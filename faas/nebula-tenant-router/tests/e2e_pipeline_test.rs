@@ -3,7 +3,7 @@ use nebula_dataset_forge::{
     mix_with_golden, ExampleSource, GoldenTrainingRow, ReplayConfig, TrainingExample,
 };
 use nebula_golden_dataset_manager::{promote_if_stable, CandidateRow, GoldenRow, GoldenStore};
-use nebula_tenant_core::{deterministic_test_tenant, TenantRegistry};
+use nebula_tenant_core::{deterministic_test_tenant, TenantId, TenantRegistry};
 use nebula_tenant_router::{
     route_tenant_triplet_with_registry, TelemetryTriplet, TenantRouterConfig,
 };
@@ -14,10 +14,10 @@ struct Registry;
 
 impl TenantRegistry for Registry {
     fn lookup_tenant_uuid(&self, raw_id: &str) -> Result<Option<Uuid>> {
-        Ok((raw_id == "acme").then(|| deterministic_test_tenant(raw_id)))
+        Ok((raw_id == "acme").then(|| deterministic_test_tenant(raw_id).0))
     }
 
-    fn tenant_row_count(&self, _tenant_id: Uuid) -> Result<usize> {
+    fn tenant_row_count(&self, _tenant_id: TenantId) -> Result<usize> {
         Ok(1)
     }
 }
