@@ -13,7 +13,8 @@ members = [
   "nebula-lora-validator",
   "nebula-p2p-sync-agent",
   "nebula-crdt-merger",
-  "nebula-quantization-engine"
+  "nebula-quantization-engine",
+  "nebula-drift-monitor"
 ]
 resolver = "2"
 

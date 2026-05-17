@@ -26,6 +26,10 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       hostVramGb: 8,
       variants: []
     },
+    drift: {
+      metrics: [],
+      triggers: []
+    },
     federation: {
       paused: false,
       peers: [],
@@ -210,6 +214,21 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       return;
     }
 
+    if (envelope.action === "nebula.drift.metrics") {
+      this.state.drift.metrics = normalizeDriftMetrics(envelope.payload);
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.drift.detected") {
+      const drift = normalizeDriftMetric(envelope.payload);
+      this.state.drift.triggers = [drift, ...this.state.drift.triggers].slice(0, 10);
+      this.state.drift.metrics = [drift, ...this.state.drift.metrics.filter((item) => item.topic !== drift.topic)].slice(0, 10);
+      this.appendLog(`Drift detected: ${drift.topic} confidence ${Math.round(drift.confidenceScore * 100)}%`);
+      this.postState();
+      return;
+    }
+
     if (envelope.action === "nebula.federation.peer") {
       const payload = envelope.payload as Partial<{ nodeId: string; node_id: string; recordCount: number; record_count: number }>;
       const nodeId = payload.nodeId ?? payload.node_id ?? "unknown";
@@ -333,4 +352,47 @@ function normalizeArtifactVariants(payload: unknown): DashboardState["deployment
       minVramGb: typeof variant.minVramGb === "number" ? variant.minVramGb : typeof variant.min_vram_gb === "number" ? variant.min_vram_gb : 0
     };
   });
+}
+
+function normalizeDriftMetrics(payload: unknown): DashboardState["drift"]["metrics"] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.map(normalizeDriftMetric);
+}
+
+function normalizeDriftMetric(payload: unknown): DashboardState["drift"]["metrics"][number] {
+  const metric = payload as Partial<{
+    topic: string;
+    confidenceScore: number;
+    confidence_score: number;
+    threshold: number;
+    sampleCount: number;
+    sample_count: number;
+    uncertainCount: number;
+    uncertain_count: number;
+  }>;
+  return {
+    topic: typeof metric.topic === "string" ? metric.topic : "unknown",
+    confidenceScore:
+      typeof metric.confidenceScore === "number"
+        ? metric.confidenceScore
+        : typeof metric.confidence_score === "number"
+          ? metric.confidence_score
+          : 0,
+    threshold: typeof metric.threshold === "number" ? metric.threshold : 0,
+    sampleCount:
+      typeof metric.sampleCount === "number"
+        ? metric.sampleCount
+        : typeof metric.sample_count === "number"
+          ? metric.sample_count
+          : 0,
+    uncertainCount:
+      typeof metric.uncertainCount === "number"
+        ? metric.uncertainCount
+        : typeof metric.uncertain_count === "number"
+          ? metric.uncertain_count
+          : 0
+  };
 }

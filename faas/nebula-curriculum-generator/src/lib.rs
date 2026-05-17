@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 
 pub const AGENT_INFERENCE_TOPIC: &str = "tachyon.agents.inference.pending";
 pub const CORRELATION_HEADER: &str = "x-nebula-curriculum-id";
+pub const DRIFT_CORRELATION_HEADER: &str = "x-nebula-drift-topic";
+pub const DRIFT_TOPIC: &str = "nebula.drift.detected";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CurriculumRequest {
@@ -23,6 +25,15 @@ pub struct AgentInferenceEvent {
     pub topic: String,
     pub prompt: String,
     pub headers: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DriftDetectedEvent {
+    pub topic: String,
+    pub confidence_score: f32,
+    pub threshold: f32,
+    pub sample_count: usize,
+    pub uncertain_count: usize,
 }
 
 pub trait TeacherModel {
@@ -61,6 +72,60 @@ pub fn generate_and_inject(
                 task.constraints.join("\n")
             ),
             headers: serde_json::json!({ CORRELATION_HEADER: request.curriculum_id }),
+        };
+        bus.publish(AGENT_INFERENCE_TOPIC, &event)?;
+        events.push(event);
+    }
+
+    Ok(events)
+}
+
+pub fn handle_drift_detected(
+    teacher: &impl TeacherModel,
+    bus: &mut impl EventBus,
+    topic: &str,
+    raw_payload: &[u8],
+    count: usize,
+) -> Result<Vec<AgentInferenceEvent>> {
+    if topic != DRIFT_TOPIC {
+        return Err(anyhow!("unsupported topic: {topic}"));
+    }
+
+    let drift: DriftDetectedEvent = serde_json::from_slice(raw_payload)?;
+    generate_drift_curriculum(teacher, bus, drift, count)
+}
+
+pub fn generate_drift_curriculum(
+    teacher: &impl TeacherModel,
+    bus: &mut impl EventBus,
+    drift: DriftDetectedEvent,
+    count: usize,
+) -> Result<Vec<AgentInferenceEvent>> {
+    if count == 0 {
+        return Err(anyhow!("curriculum count must be greater than zero"));
+    }
+
+    let subject = format!(
+        "{} drift confidence {:.2} below {:.2}",
+        drift.topic, drift.confidence_score, drift.threshold
+    );
+    let tasks = teacher.generate_curriculum(&subject, count, &curriculum_schema())?;
+    let mut events = Vec::with_capacity(tasks.len());
+
+    for task in tasks {
+        let event = AgentInferenceEvent {
+            topic: AGENT_INFERENCE_TOPIC.to_string(),
+            prompt: format!(
+                "The swarm is failing on tasks related to '{}'.\n{}\n\n{}\n\nConstraints:\n{}",
+                drift.topic,
+                task.title,
+                task.description,
+                task.constraints.join("\n")
+            ),
+            headers: serde_json::json!({
+                CORRELATION_HEADER: format!("drift:{}", drift.topic),
+                DRIFT_CORRELATION_HEADER: drift.topic
+            }),
         };
         bus.publish(AGENT_INFERENCE_TOPIC, &event)?;
         events.push(event);
@@ -131,5 +196,29 @@ mod tests {
 
         assert_eq!(events.len(), 2);
         assert_eq!(bus.0[0].headers[CORRELATION_HEADER], "cur-1");
+    }
+
+    #[test]
+    fn drift_event_generates_targeted_curriculum() {
+        let mut bus = Bus(Vec::new());
+        let events = generate_drift_curriculum(
+            &Teacher,
+            &mut bus,
+            DriftDetectedEvent {
+                topic: "React 19 hooks".into(),
+                confidence_score: 0.82,
+                threshold: 0.90,
+                sample_count: 1000,
+                uncertain_count: 180,
+            },
+            1,
+        )
+        .unwrap();
+
+        assert!(events[0].prompt.contains("React 19 hooks"));
+        assert_eq!(
+            events[0].headers[DRIFT_CORRELATION_HEADER],
+            "React 19 hooks"
+        );
     }
 }

@@ -22,6 +22,10 @@
           hostVramGb: 8,
           variants: []
         },
+        drift: {
+          metrics: [],
+          triggers: []
+        },
         federation: {
           paused: false,
           peers: [],
@@ -106,6 +110,21 @@
                         </div>
                       `
         ).join("")}
+          </div>
+        </article>
+      </section>
+      <section class="grid">
+        <article class="deployment">
+          <h2>Drift</h2>
+          <div class="driftGrid">
+            <div>
+              <h3>Current Metrics</h3>
+              ${driftRows(state.drift.metrics, "No drift metrics")}
+            </div>
+            <div>
+              <h3>Retraining Triggers</h3>
+              ${driftRows(state.drift.triggers, "No retraining triggers")}
+            </div>
           </div>
         </article>
       </section>
@@ -241,6 +260,23 @@
     </table>
   `;
       }
+      function driftRows(metrics, empty) {
+        if (metrics.length === 0) {
+          return `<p class="muted">${empty}</p>`;
+        }
+        return `
+    <div class="peers">
+      ${metrics.map(
+          (metric) => `
+            <div class="peer">
+              <span>${escapeHtml(metric.topic)}</span>
+              <strong>${Math.round(metric.confidenceScore * 100)}% / ${metric.sampleCount}</strong>
+            </div>
+          `
+        ).join("")}
+    </div>
+  `;
+      }
       function formatBytes(bytes) {
         if (bytes >= 1e9) {
           return `${(bytes / 1e9).toFixed(1)}GB`;
@@ -292,6 +328,7 @@
   select { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 8px; }
   button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: 0; padding: 9px 12px; cursor: pointer; }
   .diff { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .driftGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
   .peers { display: grid; gap: 8px; }
   .peer { display: flex; justify-content: space-between; gap: 10px; border: 1px solid var(--vscode-panel-border); padding: 8px; }
   .peer span { overflow-wrap: anywhere; }

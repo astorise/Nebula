@@ -58,6 +58,19 @@ export interface DeploymentArtifacts {
   variants: ArtifactVariant[];
 }
 
+export interface DriftMetric {
+  topic: string;
+  confidenceScore: number;
+  threshold: number;
+  sampleCount: number;
+  uncertainCount: number;
+}
+
+export interface DriftState {
+  metrics: DriftMetric[];
+  triggers: DriftMetric[];
+}
+
 export interface DashboardState {
   connectionStatus: string;
   dataset: DatasetState;
@@ -65,6 +78,7 @@ export interface DashboardState {
   validation?: ValidationResult;
   deploymentStatus?: string;
   deploymentArtifacts: DeploymentArtifacts;
+  drift: DriftState;
   federation: FederationState;
   logs: string[];
 }
