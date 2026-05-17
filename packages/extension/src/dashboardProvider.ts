@@ -30,6 +30,12 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       status: "unknown",
       metrics: []
     },
+    privacy: {
+      sandboxInput: "",
+      sandboxOutput: "",
+      totalMasked: 0,
+      byRule: {}
+    },
     drift: {
       metrics: [],
       triggers: []
@@ -135,6 +141,12 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       this.appendLog(`Deployment variant ceiling set to ${message.payload.maxVariant}`);
       this.postState();
     }
+
+    if (message.action === "privacy.sandbox.test") {
+      this.state.privacy.sandboxInput = message.payload.text;
+      this.sendCommand("privacy.sandbox.test", message.payload);
+      this.postState();
+    }
   }
 
   private handleSocketMessage(raw: string): void {
@@ -225,6 +237,23 @@ export class NebulaDashboardProvider implements vscode.Disposable {
         status: payload.status ?? "unknown",
         metrics: normalizeCanaryMetrics(payload.metrics)
       };
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.privacy.metrics") {
+      const payload = envelope.payload as Partial<{ totalMasked: number; total_masked: number; byRule: Record<string, number>; by_rule: Record<string, number> }>;
+      this.state.privacy.totalMasked = payload.totalMasked ?? payload.total_masked ?? this.state.privacy.totalMasked;
+      this.state.privacy.byRule = payload.byRule ?? payload.by_rule ?? this.state.privacy.byRule;
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.privacy.sandbox.result") {
+      const payload = envelope.payload as Partial<{ maskedText: string; masked_text: string; totalMasked: number; total_masked: number; byRule: Record<string, number>; by_rule: Record<string, number> }>;
+      this.state.privacy.sandboxOutput = payload.maskedText ?? payload.masked_text ?? "";
+      this.state.privacy.totalMasked = payload.totalMasked ?? payload.total_masked ?? 0;
+      this.state.privacy.byRule = payload.byRule ?? payload.by_rule ?? {};
       this.postState();
       return;
     }

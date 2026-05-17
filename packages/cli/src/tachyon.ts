@@ -17,6 +17,7 @@ export interface TachyonConfigClient {
   deployLora(artifact: string): Promise<void>;
   listArtifactVariants(): Promise<ArtifactVariant[]>;
   listCanaryMetrics(): Promise<CanaryMetric[]>;
+  testPrivacySandbox(text: string): Promise<PrivacySandboxResult>;
   setMaxVariant(maxVariant: string): Promise<void>;
 }
 
@@ -45,6 +46,10 @@ export class StubTachyonConfigClient implements TachyonConfigClient {
     return this.canaryMetrics;
   }
 
+  async testPrivacySandbox(text: string): Promise<PrivacySandboxResult> {
+    return runPrivacySandbox(text);
+  }
+
   async setMaxVariant(maxVariant: string): Promise<void> {
     this.variantCeilings.push(maxVariant);
   }
@@ -63,6 +68,12 @@ export interface CanaryMetric {
   divergenceRate: number;
   threshold: number;
   rollback: boolean;
+}
+
+export interface PrivacySandboxResult {
+  maskedText: string;
+  totalMasked: number;
+  byRule: Record<string, number>;
 }
 
 export class StubTachyonRouter implements TachyonRouter {
@@ -89,6 +100,10 @@ export class StubTachyonRouter implements TachyonRouter {
 
     if (message.action === "deployment.variant.setMax") {
       return this.setMaxVariant(message);
+    }
+
+    if (message.action === "privacy.sandbox.test") {
+      return this.testPrivacySandbox(message);
     }
 
     const routed: TachyonMessage = {
@@ -212,6 +227,19 @@ export class StubTachyonRouter implements TachyonRouter {
       }
     };
   }
+
+  private async testPrivacySandbox(message: TachyonMessage): Promise<TachyonMessage> {
+    const text = readText(message.payload);
+    const result = await this.config.testPrivacySandbox(text);
+    const event: TachyonMessage = {
+      type: "EVENT",
+      action: "nebula.privacy.sandbox.result",
+      requestId: message.requestId,
+      payload: result
+    };
+    queueMicrotask(() => this.events.emit("event", event));
+    return event;
+  }
 }
 
 function readArtifact(payload: unknown): string {
@@ -253,4 +281,46 @@ function readMaxVariant(payload: unknown): string {
   }
 
   throw new Error("deployment.variant.setMax requires payload.maxVariant");
+}
+
+function readText(payload: unknown): string {
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "text" in payload &&
+    typeof payload.text === "string"
+  ) {
+    return payload.text;
+  }
+
+  throw new Error("privacy.sandbox.test requires payload.text");
+}
+
+function runPrivacySandbox(text: string): PrivacySandboxResult {
+  const rules: Array<{ name: string; token: string; regex: RegExp }> = [
+    { name: "email", token: "<EMAIL>", regex: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi },
+    { name: "bearer_token", token: "<BEARER_TOKEN>", regex: /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}\b/gi },
+    { name: "jwt", token: "<JWT>", regex: /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g },
+    { name: "ipv4", token: "<IPV4>", regex: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g },
+    { name: "uuid", token: "<UUID>", regex: /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi },
+    { name: "credit_card", token: "<PAYMENT_CARD>", regex: /\b(?:\d[ -]*?){13,19}\b/g }
+  ];
+  let maskedText = text;
+  const byRule: Record<string, number> = {};
+
+  for (const rule of rules) {
+    const matches = maskedText.match(rule.regex);
+    const count = matches?.length ?? 0;
+    if (count === 0) {
+      continue;
+    }
+    byRule[rule.name] = (byRule[rule.name] ?? 0) + count;
+    maskedText = maskedText.replace(rule.regex, rule.token);
+  }
+
+  return {
+    maskedText,
+    totalMasked: Object.values(byRule).reduce((sum, count) => sum + count, 0),
+    byRule
+  };
 }

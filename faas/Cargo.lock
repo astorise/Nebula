@@ -574,6 +574,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nebula-data-anonymizer"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nebula-dataset-forge"
 version = "0.1.0"
 dependencies = [

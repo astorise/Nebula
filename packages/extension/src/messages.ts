@@ -84,6 +84,13 @@ export interface CanaryState {
   metrics: CanaryMetric[];
 }
 
+export interface PrivacyState {
+  sandboxInput: string;
+  sandboxOutput: string;
+  totalMasked: number;
+  byRule: Record<string, number>;
+}
+
 export interface DashboardState {
   connectionStatus: string;
   dataset: DatasetState;
@@ -92,6 +99,7 @@ export interface DashboardState {
   deploymentStatus?: string;
   deploymentArtifacts: DeploymentArtifacts;
   canary: CanaryState;
+  privacy: PrivacyState;
   drift: DriftState;
   federation: FederationState;
   logs: string[];
@@ -107,7 +115,8 @@ export type WebviewToExtensionMessage =
   | { type: "COMMAND"; action: "training.forceMerge"; payload: Record<string, never> }
   | { type: "COMMAND"; action: "DEPLOY_LORA"; payload: { artifact: string } }
   | { type: "COMMAND"; action: "federation.sync.setPaused"; payload: { paused: boolean } }
-  | { type: "COMMAND"; action: "deployment.variant.setMax"; payload: { maxVariant: string } };
+  | { type: "COMMAND"; action: "deployment.variant.setMax"; payload: { maxVariant: string } }
+  | { type: "COMMAND"; action: "privacy.sandbox.test"; payload: { text: string } };
 
 export type ExtensionToWebviewMessage =
   | { type: "STATE"; payload: DashboardState }

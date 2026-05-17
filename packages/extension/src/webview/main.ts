@@ -12,6 +12,7 @@ interface DashboardState {
   deploymentStatus?: string;
   deploymentArtifacts: DeploymentArtifacts;
   canary: CanaryState;
+  privacy: PrivacyState;
   drift: DriftState;
   federation: FederationState;
   logs: string[];
@@ -87,6 +88,13 @@ interface CanaryMetric {
   rollback: boolean;
 }
 
+interface PrivacyState {
+  sandboxInput: string;
+  sandboxOutput: string;
+  totalMasked: number;
+  byRule: Record<string, number>;
+}
+
 interface VsCodeApi {
   postMessage(message: unknown): void;
 }
@@ -111,6 +119,12 @@ let state: DashboardState = {
   canary: {
     status: "unknown",
     metrics: []
+  },
+  privacy: {
+    sandboxInput: "",
+    sandboxOutput: "",
+    totalMasked: 0,
+    byRule: {}
   },
   drift: {
     metrics: [],
@@ -217,6 +231,26 @@ function render(): void {
                     .join("")
             }
           </div>
+        </article>
+      </section>
+      <section class="grid">
+        <article class="deployment">
+          <h2>Privacy</h2>
+          <div class="privacyGrid">
+            <label>
+              Sandbox
+              <textarea id="privacyInput">${escapeHtml(state.privacy.sandboxInput)}</textarea>
+            </label>
+            <label>
+              Masked
+              <textarea readonly>${escapeHtml(state.privacy.sandboxOutput)}</textarea>
+            </label>
+          </div>
+          <div class="deployHeader">
+            <p class="muted">${state.privacy.totalMasked} entities masked</p>
+            <button id="runPrivacySandbox" type="button">Run sandbox</button>
+          </div>
+          ${privacyRuleRows()}
         </article>
       </section>
       <section class="grid">
@@ -333,6 +367,15 @@ function render(): void {
       payload: { maxVariant }
     });
   });
+
+  document.getElementById("runPrivacySandbox")?.addEventListener("click", () => {
+    const text = (document.getElementById("privacyInput") as HTMLTextAreaElement | null)?.value ?? "";
+    vscode.postMessage({
+      type: "COMMAND",
+      action: "privacy.sandbox.test",
+      payload: { text }
+    });
+  });
 }
 
 function step(value: DashboardState["trainingStatus"], label: string): string {
@@ -415,6 +458,28 @@ function canaryHealth(): string {
   `;
 }
 
+function privacyRuleRows(): string {
+  const entries = Object.entries(state.privacy.byRule);
+  if (entries.length === 0) {
+    return `<p class="muted">No masking activity yet</p>`;
+  }
+
+  return `
+    <div class="peers">
+      ${entries
+        .map(
+          ([rule, count]) => `
+            <div class="peer">
+              <span>${escapeHtml(rule)}</span>
+              <strong>${count}</strong>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function driftRows(metrics: DriftMetric[], empty: string): string {
   if (metrics.length === 0) {
     return `<p class="muted">${empty}</p>`;
@@ -491,10 +556,12 @@ style.textContent = `
   form { display: grid; gap: 10px; }
   label { display: grid; gap: 4px; }
   input { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 8px; }
+  textarea { min-height: 120px; resize: vertical; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 8px; font-family: var(--vscode-editor-font-family); }
   select { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 8px; }
   button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: 0; padding: 9px 12px; cursor: pointer; }
   .diff { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
   .driftGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .privacyGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
   .peers { display: grid; gap: 8px; }
   .peer { display: flex; justify-content: space-between; gap: 10px; border: 1px solid var(--vscode-panel-border); padding: 8px; }
   .peer span { overflow-wrap: anywhere; }

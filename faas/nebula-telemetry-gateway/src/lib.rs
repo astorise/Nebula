@@ -3,6 +3,7 @@ use prost::Message;
 use serde::{Deserialize, Serialize};
 
 pub const INPUT_TOPIC: &str = "pulsar.telemetry.inference_triplets";
+pub const RAW_INPUT_TOPIC: &str = "nebula.telemetry.raw_inferences";
 pub const AST_TOPIC: &str = "nebula.eval.ast.pending";
 pub const SEMANTIC_TOPIC: &str = "nebula.eval.semantic.pending";
 pub const AST_MICROVM_URL: &str =
@@ -146,5 +147,21 @@ mod tests {
 
         assert_eq!(frame[0], 0);
         assert!(frame.len() > 5);
+    }
+
+    #[test]
+    fn rejects_raw_telemetry_topic() {
+        struct Bus;
+
+        impl EventBus for Bus {
+            fn publish(&mut self, _topic: &str, _payload: &InferenceTriplet) -> Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut bus = Bus;
+        let error = handle_event(&mut bus, RAW_INPUT_TOPIC, b"{}").unwrap_err();
+
+        assert!(error.to_string().contains("unsupported topic"));
     }
 }

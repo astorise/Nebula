@@ -1,8 +1,7 @@
 # telemetry-gateway Specification
 
-## Purpose
-TBD - created by archiving change nebula-data-pipeline. Update Purpose after archive.
-## Requirements
+## MODIFIED Requirements
+
 ### Requirement: Telemetry gateway routes inference triplets
 
 The telemetry gateway SHALL subscribe to sanitized inference triplets emitted by the data anonymizer and route them to the appropriate Nebula evaluator topic.
@@ -24,4 +23,3 @@ The telemetry gateway SHALL subscribe to sanitized inference triplets emitted by
 - **GIVEN** an event arrives on `nebula.telemetry.raw_inferences`
 - **WHEN** the telemetry gateway handles the event directly
 - **THEN** the gateway rejects the event without publishing an evaluator request
-
