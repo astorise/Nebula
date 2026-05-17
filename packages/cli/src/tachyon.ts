@@ -16,6 +16,7 @@ export interface TachyonRouter {
 export interface TachyonConfigClient {
   deployLora(artifact: string): Promise<void>;
   listArtifactVariants(): Promise<ArtifactVariant[]>;
+  listCanaryMetrics(): Promise<CanaryMetric[]>;
   setMaxVariant(maxVariant: string): Promise<void>;
 }
 
@@ -27,6 +28,10 @@ export class StubTachyonConfigClient implements TachyonConfigClient {
     { title: "q8_0", artifact: "oci://localhost:5000/pulsar-lora:v3-q8_0", sizeBytes: 7_200_000_000, minVramGb: 8 },
     { title: "q4_k", artifact: "oci://localhost:5000/pulsar-lora:v3-q4_k", sizeBytes: 3_800_000_000, minVramGb: 4 }
   ];
+  private readonly canaryMetrics: CanaryMetric[] = [
+    { modelVersion: "pulsar-base:v2", rolloutTrack: "stable", divergenceRate: 0.012, threshold: 0.04, rollback: false },
+    { modelVersion: "pulsar-base:v2-canary", rolloutTrack: "canary", divergenceRate: 0.018, threshold: 0.04, rollback: false }
+  ];
 
   async deployLora(artifact: string): Promise<void> {
     this.deployments.push(artifact);
@@ -34,6 +39,10 @@ export class StubTachyonConfigClient implements TachyonConfigClient {
 
   async listArtifactVariants(): Promise<ArtifactVariant[]> {
     return this.variants;
+  }
+
+  async listCanaryMetrics(): Promise<CanaryMetric[]> {
+    return this.canaryMetrics;
   }
 
   async setMaxVariant(maxVariant: string): Promise<void> {
@@ -46,6 +55,14 @@ export interface ArtifactVariant {
   artifact: string;
   sizeBytes: number;
   minVramGb: number;
+}
+
+export interface CanaryMetric {
+  modelVersion: string;
+  rolloutTrack: "stable" | "canary" | string;
+  divergenceRate: number;
+  threshold: number;
+  rollback: boolean;
 }
 
 export class StubTachyonRouter implements TachyonRouter {
@@ -64,6 +81,10 @@ export class StubTachyonRouter implements TachyonRouter {
 
     if (message.action === "deployment.artifacts.list") {
       return this.listArtifactVariants(message);
+    }
+
+    if (message.action === "deployment.canary.metrics") {
+      return this.listCanaryMetrics(message);
     }
 
     if (message.action === "deployment.variant.setMax") {
@@ -148,6 +169,21 @@ export class StubTachyonRouter implements TachyonRouter {
       payload: {
         hostVramGb: 8,
         variants
+      }
+    };
+    queueMicrotask(() => this.events.emit("event", event));
+    return event;
+  }
+
+  private async listCanaryMetrics(message: TachyonMessage): Promise<TachyonMessage> {
+    const metrics = await this.config.listCanaryMetrics();
+    const event: TachyonMessage = {
+      type: "EVENT",
+      action: "nebula.canary.metrics",
+      requestId: message.requestId,
+      payload: {
+        metrics,
+        status: metrics.some((metric) => metric.rollback) ? "rollback" : "healthy"
       }
     };
     queueMicrotask(() => this.events.emit("event", event));

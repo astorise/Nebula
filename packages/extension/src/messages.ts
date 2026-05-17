@@ -71,6 +71,19 @@ export interface DriftState {
   triggers: DriftMetric[];
 }
 
+export interface CanaryMetric {
+  modelVersion: string;
+  rolloutTrack: string;
+  divergenceRate: number;
+  threshold: number;
+  rollback: boolean;
+}
+
+export interface CanaryState {
+  status: "healthy" | "rollback" | "unknown";
+  metrics: CanaryMetric[];
+}
+
 export interface DashboardState {
   connectionStatus: string;
   dataset: DatasetState;
@@ -78,6 +91,7 @@ export interface DashboardState {
   validation?: ValidationResult;
   deploymentStatus?: string;
   deploymentArtifacts: DeploymentArtifacts;
+  canary: CanaryState;
   drift: DriftState;
   federation: FederationState;
   logs: string[];

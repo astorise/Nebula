@@ -11,6 +11,7 @@ interface DashboardState {
   validation?: ValidationResult;
   deploymentStatus?: string;
   deploymentArtifacts: DeploymentArtifacts;
+  canary: CanaryState;
   drift: DriftState;
   federation: FederationState;
   logs: string[];
@@ -73,6 +74,19 @@ interface DriftMetric {
   uncertainCount: number;
 }
 
+interface CanaryState {
+  status: "healthy" | "rollback" | "unknown";
+  metrics: CanaryMetric[];
+}
+
+interface CanaryMetric {
+  modelVersion: string;
+  rolloutTrack: string;
+  divergenceRate: number;
+  threshold: number;
+  rollback: boolean;
+}
+
 interface VsCodeApi {
   postMessage(message: unknown): void;
 }
@@ -93,6 +107,10 @@ let state: DashboardState = {
   deploymentArtifacts: {
     hostVramGb: 8,
     variants: []
+  },
+  canary: {
+    status: "unknown",
+    metrics: []
   },
   drift: {
     metrics: [],
@@ -240,6 +258,7 @@ function render(): void {
                   </div>
                 </div>
                 <p class="muted">${escapeHtml(state.deploymentStatus ?? validation.output_model)}</p>
+                ${canaryHealth()}
                 ${artifactTable()}
               `
               : `<p class="muted">Waiting for LoRA validation results</p>`
@@ -372,6 +391,30 @@ function artifactTable(): string {
   `;
 }
 
+function canaryHealth(): string {
+  if (state.canary.metrics.length === 0) {
+    return `<p class="muted">Waiting for canary metrics</p>`;
+  }
+
+  return `
+    <div>
+      <h3>Canary Health</h3>
+      <div class="peers">
+        ${state.canary.metrics
+          .map(
+            (metric) => `
+              <div class="peer">
+                <span>${escapeHtml(metric.rolloutTrack)} · ${escapeHtml(metric.modelVersion)}</span>
+                <strong class="${metric.rollback ? "rollback" : "healthy"}">${formatPercent(metric.divergenceRate)} / ${formatPercent(metric.threshold)}</strong>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
 function driftRows(metrics: DriftMetric[], empty: string): string {
   if (metrics.length === 0) {
     return `<p class="muted">${empty}</p>`;
@@ -401,6 +444,10 @@ function formatBytes(bytes: number): string {
     return `${(bytes / 1_000_000).toFixed(1)}MB`;
   }
   return `${bytes}B`;
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function safetyLabel(minVramGb: number): string {
@@ -461,6 +508,8 @@ style.textContent = `
   .green { background: var(--vscode-charts-green); color: var(--vscode-editor-background); }
   .yellow { background: var(--vscode-charts-yellow); color: var(--vscode-editor-background); }
   .red { background: var(--vscode-charts-red); color: var(--vscode-editor-background); }
+  .healthy { color: var(--vscode-charts-green); }
+  .rollback { color: var(--vscode-charts-red); }
   .logs { display: grid; gap: 6px; max-height: 260px; overflow: auto; }
   .logs p { font-family: var(--vscode-editor-font-family); font-size: 12px; padding: 6px; background: var(--vscode-input-background); }
 `;

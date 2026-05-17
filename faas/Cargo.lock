@@ -584,6 +584,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nebula-deployment-policy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nebula-divergence-aggregator"
 version = "0.1.0"
 dependencies = [

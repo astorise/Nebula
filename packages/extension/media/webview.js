@@ -22,6 +22,10 @@
           hostVramGb: 8,
           variants: []
         },
+        canary: {
+          status: "unknown",
+          metrics: []
+        },
         drift: {
           metrics: [],
           triggers: []
@@ -150,6 +154,7 @@
                   </div>
                 </div>
                 <p class="muted">${escapeHtml(state.deploymentStatus ?? validation.output_model)}</p>
+                ${canaryHealth()}
                 ${artifactTable()}
               ` : `<p class="muted">Waiting for LoRA validation results</p>`}
         </article>
@@ -260,6 +265,26 @@
     </table>
   `;
       }
+      function canaryHealth() {
+        if (state.canary.metrics.length === 0) {
+          return `<p class="muted">Waiting for canary metrics</p>`;
+        }
+        return `
+    <div>
+      <h3>Canary Health</h3>
+      <div class="peers">
+        ${state.canary.metrics.map(
+          (metric) => `
+              <div class="peer">
+                <span>${escapeHtml(metric.rolloutTrack)} \xB7 ${escapeHtml(metric.modelVersion)}</span>
+                <strong class="${metric.rollback ? "rollback" : "healthy"}">${formatPercent(metric.divergenceRate)} / ${formatPercent(metric.threshold)}</strong>
+              </div>
+            `
+        ).join("")}
+      </div>
+    </div>
+  `;
+      }
       function driftRows(metrics, empty) {
         if (metrics.length === 0) {
           return `<p class="muted">${empty}</p>`;
@@ -285,6 +310,9 @@
           return `${(bytes / 1e6).toFixed(1)}MB`;
         }
         return `${bytes}B`;
+      }
+      function formatPercent(value) {
+        return `${(value * 100).toFixed(1)}%`;
       }
       function safetyLabel(minVramGb) {
         const available = state.deploymentArtifacts.hostVramGb;
@@ -342,6 +370,8 @@
   .green { background: var(--vscode-charts-green); color: var(--vscode-editor-background); }
   .yellow { background: var(--vscode-charts-yellow); color: var(--vscode-editor-background); }
   .red { background: var(--vscode-charts-red); color: var(--vscode-editor-background); }
+  .healthy { color: var(--vscode-charts-green); }
+  .rollback { color: var(--vscode-charts-red); }
   .logs { display: grid; gap: 6px; max-height: 260px; overflow: auto; }
   .logs p { font-family: var(--vscode-editor-font-family); font-size: 12px; padding: 6px; background: var(--vscode-input-background); }
 `;

@@ -1,0 +1,22 @@
+package tachyon:telemetry;
+
+interface custom-metrics {
+  enum metric-type {
+    gauge,
+    counter,
+  }
+
+  record metric-tag {
+    key: string,
+    value: string,
+  }
+
+  record metric {
+    name: string,
+    value: float64,
+    metric-type: metric-type,
+    tags: list<metric-tag>,
+  }
+
+  push: func(metric: metric);
+}

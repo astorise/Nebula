@@ -26,6 +26,10 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       hostVramGb: 8,
       variants: []
     },
+    canary: {
+      status: "unknown",
+      metrics: []
+    },
     drift: {
       metrics: [],
       triggers: []
@@ -77,6 +81,7 @@ export class NebulaDashboardProvider implements vscode.Disposable {
         this.setConnectionStatus("connected");
         this.sendCommand("dashboard.ready", {});
         this.sendCommand("deployment.artifacts.list", {});
+        this.sendCommand("deployment.canary.metrics", {});
       });
 
       this.socket.on("message", (raw) => {
@@ -210,6 +215,16 @@ export class NebulaDashboardProvider implements vscode.Disposable {
     if (envelope.action === "nebula.deployment.variant_ceiling") {
       const payload = envelope.payload as Partial<{ maxVariant: string }>;
       this.state.deploymentArtifacts.maxVariant = payload.maxVariant;
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.canary.metrics") {
+      const payload = envelope.payload as Partial<{ metrics: unknown[]; status: "healthy" | "rollback" | "unknown" }>;
+      this.state.canary = {
+        status: payload.status ?? "unknown",
+        metrics: normalizeCanaryMetrics(payload.metrics)
+      };
       this.postState();
       return;
     }
@@ -395,4 +410,30 @@ function normalizeDriftMetric(payload: unknown): DashboardState["drift"]["metric
           ? metric.uncertain_count
           : 0
   };
+}
+
+function normalizeCanaryMetrics(payload: unknown): DashboardState["canary"]["metrics"] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.map((item) => {
+    const metric = item as Partial<{
+      modelVersion: string;
+      model_version: string;
+      rolloutTrack: string;
+      rollout_track: string;
+      divergenceRate: number;
+      divergence_rate: number;
+      threshold: number;
+      rollback: boolean;
+    }>;
+    return {
+      modelVersion: typeof metric.modelVersion === "string" ? metric.modelVersion : typeof metric.model_version === "string" ? metric.model_version : "unknown",
+      rolloutTrack: typeof metric.rolloutTrack === "string" ? metric.rolloutTrack : typeof metric.rollout_track === "string" ? metric.rollout_track : "unknown",
+      divergenceRate: typeof metric.divergenceRate === "number" ? metric.divergenceRate : typeof metric.divergence_rate === "number" ? metric.divergence_rate : 0,
+      threshold: typeof metric.threshold === "number" ? metric.threshold : 0,
+      rollback: metric.rollback === true
+    };
+  });
 }

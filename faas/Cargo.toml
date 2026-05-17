@@ -14,7 +14,8 @@ members = [
   "nebula-p2p-sync-agent",
   "nebula-crdt-merger",
   "nebula-quantization-engine",
-  "nebula-drift-monitor"
+  "nebula-drift-monitor",
+  "nebula-deployment-policy"
 ]
 resolver = "2"
 
