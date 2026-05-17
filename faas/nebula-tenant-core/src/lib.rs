@@ -36,7 +36,10 @@ pub trait TenantRegistry {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
-#[ts(export, export_to = "../../../packages/extension/src/types/generated.ts")]
+#[ts(
+    export,
+    export_to = "../../../packages/extension/src/types/generated.ts"
+)]
 pub struct TenantSummary {
     #[ts(type = "string")]
     pub tenant_id: Uuid,

@@ -23,7 +23,9 @@ members = [
   "nebula-tool-architect",
   "nebula-tool-gap-analyzer",
   "nebula-wasm-foundry",
-  "nebula-tenant-core"
+  "nebula-tenant-core",
+  "nebula-semantic-deduplicator",
+  "nebula-economic-governor"
 ]
 resolver = "2"
 

@@ -21,6 +21,7 @@ export interface TachyonConfigClient {
   setMaxVariant(maxVariant: string): Promise<void>;
   listTenants(): Promise<TenantSummary[]>;
   listGoldenRows(): Promise<GoldenRow[]>;
+  listFinOpsMetrics(): Promise<FinOpsMetrics>;
 }
 
 export class StubTachyonConfigClient implements TachyonConfigClient {
@@ -42,6 +43,14 @@ export class StubTachyonConfigClient implements TachyonConfigClient {
   private readonly goldenRows: GoldenRow[] = [
     { prompt: "Write safe Rust file IO", answer: "Use std::fs::read_to_string and return Result.", locked: true }
   ];
+  private readonly finopsMetrics: FinOpsMetrics = {
+    dailyCostUsd: 1.24,
+    monthlyCostUsd: 18.72,
+    tokenBudget: 100_000,
+    tokensUsed: 12_400,
+    tokensSaved: 8_800,
+    deduplicatedRequests: 17
+  };
 
   async deployLora(artifact: string): Promise<void> {
     this.deployments.push(artifact);
@@ -69,6 +78,10 @@ export class StubTachyonConfigClient implements TachyonConfigClient {
 
   async listGoldenRows(): Promise<GoldenRow[]> {
     return this.goldenRows;
+  }
+
+  async listFinOpsMetrics(): Promise<FinOpsMetrics> {
+    return this.finopsMetrics;
   }
 }
 
@@ -103,6 +116,15 @@ export interface GoldenRow {
   prompt: string;
   answer: string;
   locked: boolean;
+}
+
+export interface FinOpsMetrics {
+  dailyCostUsd: number;
+  monthlyCostUsd: number;
+  tokenBudget: number;
+  tokensUsed: number;
+  tokensSaved: number;
+  deduplicatedRequests: number;
 }
 
 export class StubTachyonRouter implements TachyonRouter {
@@ -143,6 +165,10 @@ export class StubTachyonRouter implements TachyonRouter {
       return this.listGoldenRows(message);
     }
 
+    if (message.action === "finops.metrics") {
+      return this.listFinOpsMetrics(message);
+    }
+
     if (
       message.action === "alignment.constitution.save" ||
       message.action === "alignment.preference.review" ||
@@ -150,7 +176,8 @@ export class StubTachyonRouter implements TachyonRouter {
       message.action === "tenant.purge" ||
       message.action === "golden.replayRatio.set" ||
       message.action === "golden.pin" ||
-      message.action === "foundry.approve"
+      message.action === "foundry.approve" ||
+      message.action === "finops.budget.set"
     ) {
       return this.acceptConfigCommand(message);
     }
@@ -315,6 +342,18 @@ export class StubTachyonRouter implements TachyonRouter {
         replayRatio: 0.2,
         rows
       }
+    };
+    queueMicrotask(() => this.events.emit("event", event));
+    return event;
+  }
+
+  private async listFinOpsMetrics(message: TachyonMessage): Promise<TachyonMessage> {
+    const metrics = await this.config.listFinOpsMetrics();
+    const event: TachyonMessage = {
+      type: "EVENT",
+      action: "nebula.finops.metrics",
+      requestId: message.requestId,
+      payload: metrics
     };
     queueMicrotask(() => this.events.emit("event", event));
     return event;

@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
 pub const DATASET_APPEND_TOPIC: &str = "nebula.dataset.append";
+pub const TOKEN_USAGE_TOPIC: &str = "nebula.finops.token_usage";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ArbitrationTask {
@@ -20,6 +21,14 @@ pub struct PerfectAnswer {
     pub context: serde_json::Value,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct TokenUsage {
+    pub tenant_id: String,
+    pub prompt_tokens: u64,
+    pub completion_tokens: u64,
+    pub total_tokens: u64,
+}
+
 pub trait ArbitrationQueue {
     fn pop_batch(&mut self, limit: usize) -> Result<Vec<ArbitrationTask>>;
 }
@@ -36,10 +45,16 @@ pub trait LayeredInference {
         schema: &serde_json::Value,
         batch: &[ArbitrationTask],
     ) -> Result<Vec<PerfectAnswer>>;
+    fn token_usage(&self) -> Result<Option<TokenUsage>> {
+        Ok(None)
+    }
 }
 
 pub trait EventBus {
     fn publish(&mut self, topic: &str, answer: &PerfectAnswer) -> Result<()>;
+    fn publish_token_usage(&mut self, _topic: &str, _usage: &TokenUsage) -> Result<()> {
+        Ok(())
+    }
 }
 
 pub fn arbitrate_batch(
@@ -68,6 +83,9 @@ pub fn arbitrate_batch(
     let answers = inference.decode_json(model, &answer_schema(), &batch)?;
     for answer in &answers {
         bus.publish(DATASET_APPEND_TOPIC, answer)?;
+    }
+    if let Some(usage) = inference.token_usage()? {
+        bus.publish_token_usage(TOKEN_USAGE_TOPIC, &usage)?;
     }
 
     Ok(answers)
@@ -134,11 +152,25 @@ mod tests {
                 })
                 .collect())
         }
+
+        fn token_usage(&self) -> Result<Option<TokenUsage>> {
+            Ok(Some(TokenUsage {
+                tenant_id: "acme".into(),
+                prompt_tokens: 12,
+                completion_tokens: 8,
+                total_tokens: 20,
+            }))
+        }
     }
 
     impl EventBus for Bus {
         fn publish(&mut self, _topic: &str, _answer: &PerfectAnswer) -> Result<()> {
             self.0 += 1;
+            Ok(())
+        }
+
+        fn publish_token_usage(&mut self, _topic: &str, _usage: &TokenUsage) -> Result<()> {
+            self.0 += 10;
             Ok(())
         }
     }
@@ -159,7 +191,7 @@ mod tests {
         let answers = arbitrate_batch(&mut queue, &mut inference, &mut bus, "deepseek", 8).unwrap();
 
         assert_eq!(answers.len(), 1);
-        assert_eq!(bus.0, 1);
+        assert_eq!(bus.0, 11);
         assert_eq!(inference.0[0], "load:0");
     }
 }

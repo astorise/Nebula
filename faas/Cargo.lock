@@ -668,6 +668,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nebula-economic-governor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nebula-eval-ast"
 version = "0.1.0"
 dependencies = [
@@ -734,6 +743,15 @@ dependencies = [
 
 [[package]]
 name = "nebula-semantic-chunker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nebula-semantic-deduplicator"
 version = "0.1.0"
 dependencies = [
  "anyhow",

@@ -51,6 +51,14 @@ export class NebulaDashboardProvider implements vscode.Disposable {
     foundry: {
       pendingTools: []
     },
+    finops: {
+      dailyCostUsd: 0,
+      monthlyCostUsd: 0,
+      tokenBudget: 100_000,
+      tokensUsed: 0,
+      tokensSaved: 0,
+      deduplicatedRequests: 0
+    },
     drift: {
       metrics: [],
       triggers: []
@@ -105,6 +113,7 @@ export class NebulaDashboardProvider implements vscode.Disposable {
         this.sendCommand("deployment.canary.metrics", {});
         this.sendCommand("tenant.list", {});
         this.sendCommand("golden.list", {});
+        this.sendCommand("finops.metrics", {});
       });
 
       this.socket.on("message", (raw) => {
@@ -211,6 +220,13 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       this.state.foundry.pendingTools = this.state.foundry.pendingTools.map((tool) =>
         tool.toolId === message.payload.toolId ? { ...tool, status: "approved" } : tool
       );
+      this.postState();
+    }
+
+    if (message.action === "finops.budget.set") {
+      this.state.finops.tokenBudget = message.payload.tokenBudget;
+      this.sendCommand("finops.budget.set", message.payload);
+      this.appendLog(`FinOps budget updated for ${message.payload.tenantId}`);
       this.postState();
     }
   }
@@ -420,6 +436,28 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       return;
     }
 
+    if (envelope.action === "nebula.finops.metrics") {
+      this.state.finops = normalizeFinOps(envelope.payload, this.state.finops);
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.finops.deduplicated") {
+      const payload = envelope.payload as Partial<{ savedTokens: number; saved_tokens: number }>;
+      this.state.finops.deduplicatedRequests += 1;
+      this.state.finops.tokensSaved += payload.savedTokens ?? payload.saved_tokens ?? 0;
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.finops.token_usage") {
+      const payload = envelope.payload as Partial<{ totalTokens: number; total_tokens: number; costUsd: number; cost_usd: number }>;
+      this.state.finops.tokensUsed += payload.totalTokens ?? payload.total_tokens ?? 0;
+      this.state.finops.dailyCostUsd += payload.costUsd ?? payload.cost_usd ?? 0;
+      this.postState();
+      return;
+    }
+
     this.appendLog(`${envelope.action}: ${JSON.stringify(envelope.payload)}`);
   }
 
@@ -609,4 +647,30 @@ function normalizeGoldenRows(payload: unknown): DashboardState["golden"]["rows"]
       locked: row.locked === true
     };
   });
+}
+
+function normalizeFinOps(payload: unknown, fallback: DashboardState["finops"]): DashboardState["finops"] {
+  const metrics = payload as Partial<{
+    dailyCostUsd: number;
+    daily_cost_usd: number;
+    monthlyCostUsd: number;
+    monthly_cost_usd: number;
+    tokenBudget: number;
+    token_budget: number;
+    tokensUsed: number;
+    tokens_used: number;
+    tokensSaved: number;
+    tokens_saved: number;
+    deduplicatedRequests: number;
+    deduplicated_requests: number;
+  }>;
+  return {
+    dailyCostUsd: metrics.dailyCostUsd ?? metrics.daily_cost_usd ?? fallback.dailyCostUsd,
+    monthlyCostUsd: metrics.monthlyCostUsd ?? metrics.monthly_cost_usd ?? fallback.monthlyCostUsd,
+    tokenBudget: metrics.tokenBudget ?? metrics.token_budget ?? fallback.tokenBudget,
+    tokensUsed: metrics.tokensUsed ?? metrics.tokens_used ?? fallback.tokensUsed,
+    tokensSaved: metrics.tokensSaved ?? metrics.tokens_saved ?? fallback.tokensSaved,
+    deduplicatedRequests:
+      metrics.deduplicatedRequests ?? metrics.deduplicated_requests ?? fallback.deduplicatedRequests
+  };
 }

@@ -110,6 +110,15 @@ export interface FoundryState {
   pendingTools: Array<{ toolId: string; capability: string; status: string }>;
 }
 
+export interface FinOpsState {
+  dailyCostUsd: number;
+  monthlyCostUsd: number;
+  tokenBudget: number;
+  tokensUsed: number;
+  tokensSaved: number;
+  deduplicatedRequests: number;
+}
+
 export interface DashboardState {
   connectionStatus: string;
   dataset: DatasetState;
@@ -123,6 +132,7 @@ export interface DashboardState {
   tenants: TenantState;
   golden: GoldenState;
   foundry: FoundryState;
+  finops: FinOpsState;
   drift: DriftState;
   federation: FederationState;
   logs: string[];
@@ -146,7 +156,8 @@ export type WebviewToExtensionMessage =
   | { type: "COMMAND"; action: "tenant.purge"; payload: { tenantId: string } }
   | { type: "COMMAND"; action: "golden.replayRatio.set"; payload: { ratio: number } }
   | { type: "COMMAND"; action: "golden.pin"; payload: { prompt: string; locked: boolean } }
-  | { type: "COMMAND"; action: "foundry.approve"; payload: { toolId: string } };
+  | { type: "COMMAND"; action: "foundry.approve"; payload: { toolId: string } }
+  | { type: "COMMAND"; action: "finops.budget.set"; payload: { tenantId: string; tokenBudget: number } };
 
 export type ExtensionToWebviewMessage =
   | { type: "STATE"; payload: DashboardState }

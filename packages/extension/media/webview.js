@@ -47,6 +47,14 @@
         foundry: {
           pendingTools: []
         },
+        finops: {
+          dailyCostUsd: 0,
+          monthlyCostUsd: 0,
+          tokenBudget: 1e5,
+          tokensUsed: 0,
+          tokensSaved: 0,
+          deduplicatedRequests: 0
+        },
         drift: {
           metrics: [],
           triggers: []
@@ -139,6 +147,21 @@
         </article>
       </section>
       <section class="grid">
+        <article>
+          <h2>FinOps</h2>
+          <div class="metric">${formatUsd(state.finops.dailyCostUsd)}</div>
+          <div class="peers">
+            <div class="peer"><span>Monthly</span><strong>${formatUsd(state.finops.monthlyCostUsd)}</strong></div>
+            <div class="peer"><span>Tokens</span><strong>${state.finops.tokensUsed} / ${state.finops.tokenBudget}</strong></div>
+            <div class="peer"><span>Saved</span><strong>${state.finops.tokensSaved}</strong></div>
+            <div class="peer"><span>Deduplicated</span><strong>${state.finops.deduplicatedRequests}</strong></div>
+          </div>
+          <label>
+            Token cap
+            <input id="tokenBudget" type="number" min="1" value="${state.finops.tokenBudget}">
+          </label>
+          <button id="saveFinOpsBudget" type="button">Save budget</button>
+        </article>
         <article>
           <h2>Tenants</h2>
           <label>
@@ -317,6 +340,14 @@
             type: "COMMAND",
             action: "alignment.constitution.save",
             payload: { rules }
+          });
+        });
+        document.getElementById("saveFinOpsBudget")?.addEventListener("click", () => {
+          const tokenBudget = Number.parseInt(document.getElementById("tokenBudget")?.value ?? "0", 10);
+          vscode.postMessage({
+            type: "COMMAND",
+            action: "finops.budget.set",
+            payload: { tenantId: state.tenants.activeTenantId, tokenBudget }
           });
         });
         document.getElementById("tenantSelect")?.addEventListener("change", (event) => {
@@ -548,6 +579,9 @@
       }
       function formatPercent(value) {
         return `${(value * 100).toFixed(1)}%`;
+      }
+      function formatUsd(value) {
+        return `$${value.toFixed(2)}`;
       }
       function safetyLabel(minVramGb) {
         const available = state.deploymentArtifacts.hostVramGb;
