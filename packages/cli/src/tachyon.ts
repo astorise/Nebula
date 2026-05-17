@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 
 export interface TachyonMessage {
   type: string;
+  action?: string;
   payload?: unknown;
   requestId?: string;
 }
@@ -12,10 +13,32 @@ export interface TachyonRouter {
   emitEvent(message: TachyonMessage): void;
 }
 
+export interface TachyonConfigClient {
+  deployLora(artifact: string): Promise<void>;
+}
+
+export class StubTachyonConfigClient implements TachyonConfigClient {
+  readonly deployments: string[] = [];
+
+  async deployLora(artifact: string): Promise<void> {
+    this.deployments.push(artifact);
+  }
+}
+
 export class StubTachyonRouter implements TachyonRouter {
   private readonly events = new EventEmitter();
 
+  constructor(private readonly config: TachyonConfigClient = new StubTachyonConfigClient()) {}
+
   async route(message: TachyonMessage): Promise<TachyonMessage> {
+    if (message.action === "DEPLOY_LORA") {
+      return this.deployLora(message);
+    }
+
+    if (message.action === "federation.sync.setPaused") {
+      return this.setFederationPaused(message);
+    }
+
     const routed: TachyonMessage = {
       type: "tachyon.stub.routed",
       requestId: message.requestId,
@@ -37,4 +60,78 @@ export class StubTachyonRouter implements TachyonRouter {
   emitEvent(message: TachyonMessage): void {
     this.events.emit("event", message);
   }
+
+  private async deployLora(message: TachyonMessage): Promise<TachyonMessage> {
+    const artifact = readArtifact(message.payload);
+    await this.config.deployLora(artifact);
+
+    const event: TachyonMessage = {
+      type: "EVENT",
+      action: "nebula.deployment.started",
+      requestId: message.requestId,
+      payload: {
+        artifact,
+        status: "deploying"
+      }
+    };
+    queueMicrotask(() => this.events.emit("event", event));
+
+    return {
+      type: "tachyon.config.updated",
+      action: "DEPLOY_LORA",
+      requestId: message.requestId,
+      payload: {
+        artifact,
+        accepted: true
+      }
+    };
+  }
+
+  private setFederationPaused(message: TachyonMessage): TachyonMessage {
+    const paused = readPaused(message.payload);
+    const event: TachyonMessage = {
+      type: "EVENT",
+      action: "nebula.federation.status",
+      requestId: message.requestId,
+      payload: { paused }
+    };
+    queueMicrotask(() => this.events.emit("event", event));
+
+    return {
+      type: "tachyon.config.updated",
+      action: "federation.sync.setPaused",
+      requestId: message.requestId,
+      payload: {
+        paused,
+        accepted: true
+      }
+    };
+  }
+}
+
+function readArtifact(payload: unknown): string {
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "artifact" in payload &&
+    typeof payload.artifact === "string" &&
+    payload.artifact.length > 0
+  ) {
+    return payload.artifact;
+  }
+
+  throw new Error("DEPLOY_LORA requires payload.artifact");
+}
+
+function readPaused(payload: unknown): boolean {
+  if (
+    typeof payload === "object" &&
+    payload !== null &&
+    "paused" in payload &&
+    typeof payload.paused === "boolean"
+  ) {
+    return payload.paused;
+  }
+
+  throw new Error("federation.sync.setPaused requires payload.paused");
 }

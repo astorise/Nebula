@@ -1,6 +1,12 @@
 import * as vscode from "vscode";
 import { createNebulaSocket, readConnectionConfig } from "./connection";
-import type { DashboardState, ExtensionToWebviewMessage, NebulaEnvelope, WebviewToExtensionMessage } from "./messages";
+import type {
+  DashboardState,
+  ExtensionToWebviewMessage,
+  NebulaEnvelope,
+  ValidationResult,
+  WebviewToExtensionMessage
+} from "./messages";
 
 type NebulaSocket = ReturnType<typeof createNebulaSocket>;
 
@@ -16,6 +22,11 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       direct: 0
     },
     trainingStatus: "waiting",
+    federation: {
+      paused: false,
+      peers: [],
+      contributions: []
+    },
     logs: []
   };
 
@@ -89,6 +100,20 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       this.sendCommand("training.forceMerge", {});
       this.appendLog("Manual model merge requested");
     }
+
+    if (message.action === "DEPLOY_LORA") {
+      this.sendCommand("DEPLOY_LORA", message.payload);
+      this.state.deploymentStatus = `Deploying ${message.payload.artifact}`;
+      this.appendLog(`LoRA deployment requested: ${message.payload.artifact}`);
+      this.postState();
+    }
+
+    if (message.action === "federation.sync.setPaused") {
+      this.sendCommand("federation.sync.setPaused", message.payload);
+      this.state.federation.paused = message.payload.paused;
+      this.appendLog(`Federated sync ${message.payload.paused ? "paused" : "resumed"}`);
+      this.postState();
+    }
   }
 
   private handleSocketMessage(raw: string): void {
@@ -127,6 +152,55 @@ export class NebulaDashboardProvider implements vscode.Disposable {
     if (envelope.action === "nebula.training.complete") {
       this.state.trainingStatus = "published";
       this.appendLog("Training complete and model published");
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.validation.success" || envelope.action === "nebula.validation.failed") {
+      this.state.validation = normalizeValidationResult(envelope.payload);
+      this.appendLog(
+        `Validation ${envelope.action.endsWith("success") ? "passed" : "failed"}: ${this.state.validation.artifact_ref}`
+      );
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.deployment.started") {
+      const payload = envelope.payload as Partial<{ artifact: string; status: string }>;
+      this.state.deploymentStatus = `${payload.status ?? "deploying"}: ${payload.artifact ?? "unknown artifact"}`;
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.federation.peer") {
+      const payload = envelope.payload as Partial<{ nodeId: string; node_id: string; recordCount: number; record_count: number }>;
+      const nodeId = payload.nodeId ?? payload.node_id ?? "unknown";
+      const recordCount = payload.recordCount ?? payload.record_count ?? 0;
+      this.state.federation.peers = [
+        { nodeId, recordCount, status: "active" },
+        ...this.state.federation.peers.filter((peer) => peer.nodeId !== nodeId)
+      ].slice(0, 12);
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.federation.contribution") {
+      const payload = envelope.payload as Partial<{ source: string; rows: number }>;
+      const source = payload.source ?? "remote";
+      const rows = payload.rows ?? 0;
+      const existing = this.state.federation.contributions.find((item) => item.source === source);
+      if (existing) {
+        existing.rows += rows;
+      } else {
+        this.state.federation.contributions = [{ source, rows }, ...this.state.federation.contributions].slice(0, 12);
+      }
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.federation.status") {
+      const payload = envelope.payload as Partial<{ paused: boolean }>;
+      this.state.federation.paused = payload.paused ?? this.state.federation.paused;
       this.postState();
       return;
     }
@@ -195,4 +269,14 @@ function getNonce(): string {
     nonce += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return nonce;
+}
+
+function normalizeValidationResult(payload: unknown): ValidationResult {
+  const result = payload as Partial<ValidationResult>;
+  return {
+    artifact_ref: typeof result.artifact_ref === "string" ? result.artifact_ref : "",
+    output_model: typeof result.output_model === "string" ? result.output_model : "",
+    pass_rate: typeof result.pass_rate === "number" ? result.pass_rate : 0,
+    samples: Array.isArray(result.samples) ? result.samples : []
+  };
 }

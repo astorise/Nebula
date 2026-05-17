@@ -14,10 +14,44 @@ export interface DatasetState {
 
 export type TrainingStatus = "waiting" | "backward" | "merge" | "published";
 
+export interface ValidationSample {
+  prompt: string;
+  before: string[];
+  after: string[];
+  diverged: boolean;
+}
+
+export interface ValidationResult {
+  artifact_ref: string;
+  output_model: string;
+  pass_rate: number;
+  samples: ValidationSample[];
+}
+
+export interface FederationPeer {
+  nodeId: string;
+  recordCount: number;
+  status: string;
+}
+
+export interface FederationContribution {
+  source: string;
+  rows: number;
+}
+
+export interface FederationState {
+  paused: boolean;
+  peers: FederationPeer[];
+  contributions: FederationContribution[];
+}
+
 export interface DashboardState {
   connectionStatus: string;
   dataset: DatasetState;
   trainingStatus: TrainingStatus;
+  validation?: ValidationResult;
+  deploymentStatus?: string;
+  federation: FederationState;
   logs: string[];
 }
 
@@ -28,7 +62,9 @@ export interface CurriculumCommand {
 
 export type WebviewToExtensionMessage =
   | { type: "COMMAND"; action: "curriculum.generate"; payload: CurriculumCommand }
-  | { type: "COMMAND"; action: "training.forceMerge"; payload: Record<string, never> };
+  | { type: "COMMAND"; action: "training.forceMerge"; payload: Record<string, never> }
+  | { type: "COMMAND"; action: "DEPLOY_LORA"; payload: { artifact: string } }
+  | { type: "COMMAND"; action: "federation.sync.setPaused"; payload: { paused: boolean } };
 
 export type ExtensionToWebviewMessage =
   | { type: "STATE"; payload: DashboardState }

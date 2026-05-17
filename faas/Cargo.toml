@@ -9,7 +9,10 @@ members = [
   "nebula-dataset-forge",
   "nebula-training-orchestrator",
   "nebula-doc-parser",
-  "nebula-semantic-chunker"
+  "nebula-semantic-chunker",
+  "nebula-lora-validator",
+  "nebula-p2p-sync-agent",
+  "nebula-crdt-merger"
 ]
 resolver = "2"
 

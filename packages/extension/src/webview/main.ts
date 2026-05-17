@@ -8,7 +8,41 @@ interface DashboardState {
   connectionStatus: string;
   dataset: DatasetState;
   trainingStatus: "waiting" | "backward" | "merge" | "published";
+  validation?: ValidationResult;
+  deploymentStatus?: string;
+  federation: FederationState;
   logs: string[];
+}
+
+interface ValidationSample {
+  prompt: string;
+  before: string[];
+  after: string[];
+  diverged: boolean;
+}
+
+interface ValidationResult {
+  artifact_ref: string;
+  output_model: string;
+  pass_rate: number;
+  samples: ValidationSample[];
+}
+
+interface FederationState {
+  paused: boolean;
+  peers: FederationPeer[];
+  contributions: FederationContribution[];
+}
+
+interface FederationPeer {
+  nodeId: string;
+  recordCount: number;
+  status: string;
+}
+
+interface FederationContribution {
+  source: string;
+  rows: number;
 }
 
 interface VsCodeApi {
@@ -28,6 +62,11 @@ let state: DashboardState = {
     direct: 0
   },
   trainingStatus: "waiting",
+  federation: {
+    paused: false,
+    peers: [],
+    contributions: []
+  },
   logs: []
 };
 
@@ -45,6 +84,9 @@ function render(): void {
 
   const escalatedPercent = state.dataset.total === 0 ? 0 : Math.round((state.dataset.escalated / state.dataset.total) * 100);
   const directPercent = state.dataset.total === 0 ? 0 : 100 - escalatedPercent;
+  const validation = state.validation;
+  const primarySample = validation?.samples[0];
+  const passRate = validation ? Math.round(validation.pass_rate * 100) : 0;
 
   root.innerHTML = `
     <main>
@@ -80,6 +122,77 @@ function render(): void {
         </article>
       </section>
       <section class="grid">
+        <article>
+          <h2>Federation</h2>
+          <div class="deployHeader">
+            <p class="muted">${state.federation.paused ? "Sync paused" : "Sync active"}</p>
+            <button id="toggleFederation" type="button">${state.federation.paused ? "Resume" : "Pause"}</button>
+          </div>
+          <div class="peers">
+            ${
+              state.federation.peers.length === 0
+                ? `<p class="muted">No peers discovered</p>`
+                : state.federation.peers
+                    .map(
+                      (peer) => `
+                        <div class="peer">
+                          <span>${escapeHtml(peer.nodeId)}</span>
+                          <strong>${peer.recordCount}</strong>
+                        </div>
+                      `
+                    )
+                    .join("")
+            }
+          </div>
+        </article>
+        <article>
+          <h2>Contributions</h2>
+          <div class="peers">
+            ${
+              state.federation.contributions.length === 0
+                ? `<p class="muted">Waiting for federated rows</p>`
+                : state.federation.contributions
+                    .map(
+                      (item) => `
+                        <div class="peer">
+                          <span>${escapeHtml(item.source)}</span>
+                          <strong>${item.rows}</strong>
+                        </div>
+                      `
+                    )
+                    .join("")
+            }
+          </div>
+        </article>
+      </section>
+      <section class="grid">
+        <article class="deployment">
+          <h2>Deployment</h2>
+          ${
+            validation
+              ? `
+                <div class="deployHeader">
+                  <div>
+                    <div class="metric">${passRate}%</div>
+                    <p>${escapeHtml(validation.artifact_ref)}</p>
+                  </div>
+                  <button id="deployLora" type="button">Deploy to Swarm</button>
+                </div>
+                <div class="diff">
+                  <div>
+                    <h3>Before</h3>
+                    <pre>${escapeHtml((primarySample?.before ?? []).join("\\n\\n"))}</pre>
+                  </div>
+                  <div>
+                    <h3>After</h3>
+                    <pre>${escapeHtml((primarySample?.after ?? []).join("\\n\\n"))}</pre>
+                  </div>
+                </div>
+                <p class="muted">${escapeHtml(state.deploymentStatus ?? validation.output_model)}</p>
+              `
+              : `<p class="muted">Waiting for LoRA validation results</p>`
+          }
+        </article>
         <article>
           <h2>Curriculum</h2>
           <form id="curriculumForm">
@@ -120,6 +233,26 @@ function render(): void {
       payload: {}
     });
   });
+
+  document.getElementById("deployLora")?.addEventListener("click", () => {
+    if (!state.validation?.artifact_ref) {
+      return;
+    }
+
+    vscode.postMessage({
+      type: "COMMAND",
+      action: "DEPLOY_LORA",
+      payload: { artifact: state.validation.artifact_ref }
+    });
+  });
+
+  document.getElementById("toggleFederation")?.addEventListener("click", () => {
+    vscode.postMessage({
+      type: "COMMAND",
+      action: "federation.sync.setPaused",
+      payload: { paused: !state.federation.paused }
+    });
+  });
 }
 
 function step(value: DashboardState["trainingStatus"], label: string): string {
@@ -144,9 +277,12 @@ style.textContent = `
   h1, h2, p { margin: 0; }
   h1 { font-size: 28px; }
   h2 { font-size: 14px; text-transform: uppercase; color: var(--vscode-descriptionForeground); }
+  h3 { margin: 0; font-size: 12px; color: var(--vscode-descriptionForeground); }
   .status { border: 1px solid var(--vscode-panel-border); padding: 4px 8px; font-size: 12px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
   article { border: 1px solid var(--vscode-panel-border); padding: 14px; display: grid; gap: 12px; }
+  .deployment { grid-column: 1 / -1; }
+  .deployHeader { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
   .metric { font-size: 34px; font-weight: 700; }
   .ratio { height: 12px; display: flex; background: var(--vscode-input-background); overflow: hidden; }
   .ratio span { display: block; }
@@ -160,6 +296,12 @@ style.textContent = `
   label { display: grid; gap: 4px; }
   input { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); padding: 8px; }
   button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: 0; padding: 9px 12px; cursor: pointer; }
+  .diff { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .peers { display: grid; gap: 8px; }
+  .peer { display: flex; justify-content: space-between; gap: 10px; border: 1px solid var(--vscode-panel-border); padding: 8px; }
+  .peer span { overflow-wrap: anywhere; }
+  pre { margin: 0; min-height: 120px; max-height: 240px; overflow: auto; white-space: pre-wrap; word-break: break-word; background: var(--vscode-input-background); border: 1px solid var(--vscode-panel-border); padding: 10px; font-family: var(--vscode-editor-font-family); font-size: 12px; }
+  .muted { color: var(--vscode-descriptionForeground); }
   .logs { display: grid; gap: 6px; max-height: 260px; overflow: auto; }
   .logs p { font-family: var(--vscode-editor-font-family); font-size: 12px; padding: 6px; background: var(--vscode-input-background); }
 `;

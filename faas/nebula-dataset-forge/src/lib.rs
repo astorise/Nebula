@@ -1,8 +1,10 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub const DATASET_FILE: &str = "dataset_v1.jsonl";
 pub const TRAINING_READY_TOPIC: &str = "nebula.training.ready";
+pub const DATASET_INDEX_PREFIX: &str = "nebula.dataset.index";
 pub const ESCALATED_TARGET: f32 = 0.60;
 pub const DIRECT_TARGET: f32 = 0.40;
 
@@ -48,6 +50,10 @@ pub trait VolumeStore {
     fn append_line(&mut self, path: &str, line: &str) -> Result<()>;
 }
 
+pub trait IndexStore {
+    fn put_index_key(&mut self, key: &str) -> Result<()>;
+}
+
 pub trait EventBus {
     fn publish_training_ready(&mut self, topic: &str, event: &TrainingReadyEvent) -> Result<()>;
 }
@@ -55,6 +61,7 @@ pub trait EventBus {
 pub fn append_example(
     counters: &mut impl CounterStore,
     volume: &mut impl VolumeStore,
+    index: &mut impl IndexStore,
     bus: &mut impl EventBus,
     example: TrainingExample,
     threshold: usize,
@@ -66,6 +73,7 @@ pub fn append_example(
 
     let line = serde_json::to_string(&example)?;
     volume.append_line(DATASET_FILE, &line)?;
+    index.put_index_key(&dataset_index_key(&example.prompt))?;
     let updated = counters.increment(&example.source)?;
 
     if updated.total() >= threshold {
@@ -79,6 +87,11 @@ pub fn append_example(
     }
 
     Ok(true)
+}
+
+pub fn dataset_index_key(prompt: &str) -> String {
+    let digest = Sha256::digest(prompt.as_bytes());
+    format!("{DATASET_INDEX_PREFIX}:{}", hex(&digest))
 }
 
 fn ratio_allows(counters: DatasetCounters, source: &ExampleSource) -> bool {
@@ -103,6 +116,16 @@ fn ratio_allows(counters: DatasetCounters, source: &ExampleSource) -> bool {
     escalated_ratio <= ESCALATED_TARGET + 0.10 && direct_ratio <= DIRECT_TARGET + 0.10
 }
 
+fn hex(bytes: &[u8]) -> String {
+    const CHARS: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(CHARS[(byte >> 4) as usize] as char);
+        out.push(CHARS[(byte & 0x0f) as usize] as char);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -110,6 +133,7 @@ mod tests {
     #[derive(Default)]
     struct Counters(DatasetCounters);
     struct Volume(Vec<String>);
+    struct Index(Vec<String>);
     struct Bus(usize);
 
     impl CounterStore for Counters {
@@ -132,6 +156,13 @@ mod tests {
         }
     }
 
+    impl IndexStore for Index {
+        fn put_index_key(&mut self, key: &str) -> Result<()> {
+            self.0.push(key.into());
+            Ok(())
+        }
+    }
+
     impl EventBus for Bus {
         fn publish_training_ready(
             &mut self,
@@ -147,6 +178,7 @@ mod tests {
     fn appends_jsonl_and_emits_threshold() {
         let mut counters = Counters::default();
         let mut volume = Volume(Vec::new());
+        let mut index = Index(Vec::new());
         let mut bus = Bus(0);
         let example = TrainingExample {
             prompt: "p".into(),
@@ -155,8 +187,11 @@ mod tests {
             context: serde_json::json!({}),
         };
 
-        assert!(append_example(&mut counters, &mut volume, &mut bus, example, 1).unwrap());
+        assert!(
+            append_example(&mut counters, &mut volume, &mut index, &mut bus, example, 1).unwrap()
+        );
         assert_eq!(volume.0.len(), 1);
+        assert_eq!(index.0, vec![dataset_index_key("p")]);
         assert_eq!(bus.0, 1);
     }
 }
