@@ -36,6 +36,21 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       totalMasked: 0,
       byRule: {}
     },
+    alignment: {
+      rules: ["Do not use unwrap() in generated Rust.", "Prefer fallible APIs and explicit errors."],
+      pendingPreferences: []
+    },
+    tenants: {
+      activeTenantId: "default",
+      tenants: []
+    },
+    golden: {
+      replayRatio: 0.2,
+      rows: []
+    },
+    foundry: {
+      pendingTools: []
+    },
     drift: {
       metrics: [],
       triggers: []
@@ -88,6 +103,8 @@ export class NebulaDashboardProvider implements vscode.Disposable {
         this.sendCommand("dashboard.ready", {});
         this.sendCommand("deployment.artifacts.list", {});
         this.sendCommand("deployment.canary.metrics", {});
+        this.sendCommand("tenant.list", {});
+        this.sendCommand("golden.list", {});
       });
 
       this.socket.on("message", (raw) => {
@@ -145,6 +162,55 @@ export class NebulaDashboardProvider implements vscode.Disposable {
     if (message.action === "privacy.sandbox.test") {
       this.state.privacy.sandboxInput = message.payload.text;
       this.sendCommand("privacy.sandbox.test", message.payload);
+      this.postState();
+    }
+
+    if (message.action === "alignment.constitution.save") {
+      this.state.alignment.rules = message.payload.rules;
+      this.sendCommand("alignment.constitution.save", message.payload);
+      this.appendLog("Alignment constitution updated");
+      this.postState();
+    }
+
+    if (message.action === "alignment.preference.review") {
+      this.sendCommand("alignment.preference.review", message.payload);
+      this.state.alignment.pendingPreferences = this.state.alignment.pendingPreferences.filter(
+        (item) => item.prompt !== message.payload.prompt
+      );
+      this.postState();
+    }
+
+    if (message.action === "tenant.setActive") {
+      this.state.tenants.activeTenantId = message.payload.tenantId;
+      this.sendCommand("tenant.setActive", message.payload);
+      this.appendLog(`Active tenant set to ${message.payload.tenantId}`);
+      this.postState();
+    }
+
+    if (message.action === "tenant.purge") {
+      this.sendCommand("tenant.purge", message.payload);
+      this.appendLog(`Tenant purge requested: ${message.payload.tenantId}`);
+    }
+
+    if (message.action === "golden.replayRatio.set") {
+      this.state.golden.replayRatio = message.payload.ratio;
+      this.sendCommand("golden.replayRatio.set", message.payload);
+      this.postState();
+    }
+
+    if (message.action === "golden.pin") {
+      this.sendCommand("golden.pin", message.payload);
+      this.state.golden.rows = this.state.golden.rows.map((row) =>
+        row.prompt === message.payload.prompt ? { ...row, locked: message.payload.locked } : row
+      );
+      this.postState();
+    }
+
+    if (message.action === "foundry.approve") {
+      this.sendCommand("foundry.approve", message.payload);
+      this.state.foundry.pendingTools = this.state.foundry.pendingTools.map((tool) =>
+        tool.toolId === message.payload.toolId ? { ...tool, status: "approved" } : tool
+      );
       this.postState();
     }
   }
@@ -306,6 +372,54 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       return;
     }
 
+    if (envelope.action === "nebula.alignment.preference") {
+      const payload = envelope.payload as Partial<{ prompt: string; chosen: string; rejected: string }>;
+      this.state.alignment.pendingPreferences = [
+        {
+          prompt: payload.prompt ?? "unknown prompt",
+          chosen: payload.chosen ?? "",
+          rejected: payload.rejected ?? ""
+        },
+        ...this.state.alignment.pendingPreferences
+      ].slice(0, 20);
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.tenant.list") {
+      const payload = envelope.payload as Partial<{ activeTenantId: string; active_tenant_id: string; tenants: unknown[] }>;
+      this.state.tenants = {
+        activeTenantId: payload.activeTenantId ?? payload.active_tenant_id ?? this.state.tenants.activeTenantId,
+        tenants: normalizeTenants(payload.tenants)
+      };
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.golden.rows") {
+      const payload = envelope.payload as Partial<{ replayRatio: number; replay_ratio: number; rows: unknown[] }>;
+      this.state.golden = {
+        replayRatio: payload.replayRatio ?? payload.replay_ratio ?? this.state.golden.replayRatio,
+        rows: normalizeGoldenRows(payload.rows)
+      };
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.foundry.approval_required") {
+      const payload = envelope.payload as Partial<{ toolId: string; tool_id: string; capability: string }>;
+      this.state.foundry.pendingTools = [
+        {
+          toolId: payload.toolId ?? payload.tool_id ?? "unknown",
+          capability: payload.capability ?? "unknown",
+          status: "pending"
+        },
+        ...this.state.foundry.pendingTools
+      ].slice(0, 20);
+      this.postState();
+      return;
+    }
+
     this.appendLog(`${envelope.action}: ${JSON.stringify(envelope.payload)}`);
   }
 
@@ -463,6 +577,36 @@ function normalizeCanaryMetrics(payload: unknown): DashboardState["canary"]["met
       divergenceRate: typeof metric.divergenceRate === "number" ? metric.divergenceRate : typeof metric.divergence_rate === "number" ? metric.divergence_rate : 0,
       threshold: typeof metric.threshold === "number" ? metric.threshold : 0,
       rollback: metric.rollback === true
+    };
+  });
+}
+
+function normalizeTenants(payload: unknown): DashboardState["tenants"]["tenants"] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.map((item) => {
+    const tenant = item as Partial<{ tenantId: string; tenant_id: string; rows: number; quota: number }>;
+    return {
+      tenantId: tenant.tenantId ?? tenant.tenant_id ?? "default",
+      rows: tenant.rows ?? 0,
+      quota: tenant.quota ?? 50_000
+    };
+  });
+}
+
+function normalizeGoldenRows(payload: unknown): DashboardState["golden"]["rows"] {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload.map((item) => {
+    const row = item as Partial<{ prompt: string; answer: string; locked: boolean }>;
+    return {
+      prompt: row.prompt ?? "",
+      answer: row.answer ?? "",
+      locked: row.locked === true
     };
   });
 }

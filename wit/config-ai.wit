@@ -1,0 +1,19 @@
+package nebula:config-ai;
+
+interface synthesis {
+  enum synthesis-mode {
+    disabled,
+    human-in-loop,
+    fully-autonomous,
+  }
+
+  record synthesis-config {
+    mode: synthesis-mode,
+    max-retries: u8,
+    allowed-wit-imports: list<string>,
+  }
+}
+
+world config-ai {
+  export synthesis;
+}

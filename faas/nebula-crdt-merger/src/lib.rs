@@ -4,6 +4,7 @@ use sha2::{Digest, Sha256};
 
 pub const DATASET_FILE: &str = "dataset_v1.jsonl";
 pub const TRAINING_READY_TOPIC: &str = "nebula.training.ready";
+pub const TENANT_CRDT_PREFIX: &str = "tenant";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct RemoteTrainingRow {
@@ -13,6 +14,8 @@ pub struct RemoteTrainingRow {
     pub teacher_score: Option<f32>,
     #[serde(default)]
     pub source_node: Option<String>,
+    #[serde(default)]
+    pub tenant_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -24,6 +27,8 @@ pub struct DatasetRow {
     pub teacher_score: Option<f32>,
     #[serde(default)]
     pub source_node: Option<String>,
+    #[serde(default)]
+    pub tenant_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -99,12 +104,34 @@ pub fn normalize_row(row: &RemoteTrainingRow) -> DatasetRow {
         correction: row.correction.clone(),
         teacher_score: row.teacher_score,
         source_node: row.source_node.clone(),
+        tenant_id: row.tenant_id.clone(),
     }
 }
 
 pub fn deterministic_row_id(prompt: &str) -> String {
     let digest = Sha256::digest(prompt.as_bytes());
     hex(&digest)
+}
+
+pub fn tenant_crdt_key(tenant_id: &str, prompt: &str) -> String {
+    format!(
+        "{TENANT_CRDT_PREFIX}:{}:crdt:hash:{}",
+        sanitize_tenant_id(tenant_id),
+        deterministic_row_id(prompt)
+    )
+}
+
+fn sanitize_tenant_id(tenant_id: &str) -> String {
+    tenant_id
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 fn hex(bytes: &[u8]) -> String {
@@ -201,6 +228,13 @@ mod tests {
             correction: "fixed".into(),
             teacher_score: Some(0.99),
             source_node: Some("node-b".into()),
+            tenant_id: None,
         }
+    }
+
+    #[test]
+    fn prefixes_crdt_key_with_tenant_namespace() {
+        let key = tenant_crdt_key("acme/prod", "prompt");
+        assert!(key.starts_with("tenant:acme_prod:crdt:hash:"));
     }
 }

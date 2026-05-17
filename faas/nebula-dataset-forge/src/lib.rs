@@ -3,8 +3,13 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub const DATASET_FILE: &str = "dataset_v1.jsonl";
+pub const PREFERENCE_DATASET_FILE: &str = "preference_v1.jsonl";
+pub const TOOL_DATASET_FILE: &str = "tool_calls_v1.jsonl";
+pub const GOLDEN_DATASET_FILE: &str = "golden_v1.jsonl";
 pub const TRAINING_READY_TOPIC: &str = "nebula.training.ready";
 pub const DATASET_INDEX_PREFIX: &str = "nebula.dataset.index";
+pub const TENANT_DATASET_PREFIX: &str = "/mnt/forge/tenants";
+pub const TENANT_ROW_QUOTA: usize = 50_000;
 pub const ESCALATED_TARGET: f32 = 0.60;
 pub const DIRECT_TARGET: f32 = 0.40;
 
@@ -21,6 +26,52 @@ pub struct TrainingExample {
     pub source: ExampleSource,
     #[serde(default)]
     pub context: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct PreferenceExample {
+    pub prompt: String,
+    pub chosen: String,
+    pub rejected: String,
+    #[serde(default)]
+    pub tenant_id: Option<String>,
+    #[serde(default)]
+    pub context: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ToolTrainingExample {
+    pub prompt: String,
+    pub chosen: String,
+    pub rejected: Option<String>,
+    pub tool_schema: serde_json::Value,
+    pub tool_call: serde_json::Value,
+    #[serde(default)]
+    pub tenant_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct GoldenTrainingRow {
+    pub prompt: String,
+    pub answer: String,
+    pub vector_score: f32,
+    #[serde(default)]
+    pub locked: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ReplayConfig {
+    pub live_rows: usize,
+    pub golden_rows: usize,
+}
+
+impl Default for ReplayConfig {
+    fn default() -> Self {
+        Self {
+            live_rows: 500,
+            golden_rows: 100,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -89,9 +140,128 @@ pub fn append_example(
     Ok(true)
 }
 
+pub fn append_preference_example(
+    volume: &mut impl VolumeStore,
+    index: &mut impl IndexStore,
+    example: PreferenceExample,
+) -> Result<()> {
+    let path = example
+        .tenant_id
+        .as_deref()
+        .map(tenant_preference_dataset_path)
+        .unwrap_or_else(|| PREFERENCE_DATASET_FILE.into());
+    let line = serde_json::to_string(&example)?;
+    volume.append_line(&path, &line)?;
+    index.put_index_key(&dataset_index_key(&example.prompt))?;
+    Ok(())
+}
+
+pub fn append_tool_example(
+    volume: &mut impl VolumeStore,
+    example: ToolTrainingExample,
+) -> Result<()> {
+    let path = example
+        .tenant_id
+        .as_deref()
+        .map(tenant_tool_dataset_path)
+        .unwrap_or_else(|| TOOL_DATASET_FILE.into());
+    volume.append_line(&path, &serde_json::to_string(&example)?)?;
+    Ok(())
+}
+
 pub fn dataset_index_key(prompt: &str) -> String {
     let digest = Sha256::digest(prompt.as_bytes());
     format!("{DATASET_INDEX_PREFIX}:{}", hex(&digest))
+}
+
+pub fn tenant_dataset_path(tenant_id: &str) -> String {
+    format!(
+        "{TENANT_DATASET_PREFIX}/{}/{}",
+        sanitize_tenant_id(tenant_id),
+        DATASET_FILE
+    )
+}
+
+pub fn tenant_preference_dataset_path(tenant_id: &str) -> String {
+    format!(
+        "{TENANT_DATASET_PREFIX}/{}/{}",
+        sanitize_tenant_id(tenant_id),
+        PREFERENCE_DATASET_FILE
+    )
+}
+
+pub fn tenant_tool_dataset_path(tenant_id: &str) -> String {
+    format!(
+        "{TENANT_DATASET_PREFIX}/{}/{}",
+        sanitize_tenant_id(tenant_id),
+        TOOL_DATASET_FILE
+    )
+}
+
+pub fn tenant_golden_dataset_path(tenant_id: &str) -> String {
+    format!(
+        "{TENANT_DATASET_PREFIX}/{}/{}",
+        sanitize_tenant_id(tenant_id),
+        GOLDEN_DATASET_FILE
+    )
+}
+
+pub fn tenant_index_key(tenant_id: &str, prompt: &str) -> String {
+    let digest = Sha256::digest(prompt.as_bytes());
+    format!(
+        "tenant:{}:dataset:index:{}",
+        sanitize_tenant_id(tenant_id),
+        hex(&digest)
+    )
+}
+
+pub fn enforce_tenant_quota(current_rows: usize) -> Result<()> {
+    anyhow::ensure!(
+        current_rows < TENANT_ROW_QUOTA,
+        "tenant dataset quota exceeded"
+    );
+    Ok(())
+}
+
+pub fn mix_with_golden(
+    live_rows: &[TrainingExample],
+    golden_rows: &[GoldenTrainingRow],
+    config: ReplayConfig,
+) -> Vec<TrainingExample> {
+    let mut batch: Vec<TrainingExample> =
+        live_rows.iter().take(config.live_rows).cloned().collect();
+    let mut golden: Vec<GoldenTrainingRow> = golden_rows.to_vec();
+    golden.sort_by(|left, right| {
+        right
+            .locked
+            .cmp(&left.locked)
+            .then_with(|| right.vector_score.total_cmp(&left.vector_score))
+    });
+    batch.extend(
+        golden
+            .into_iter()
+            .take(config.golden_rows)
+            .map(|row| TrainingExample {
+                prompt: row.prompt,
+                answer: row.answer,
+                source: ExampleSource::Escalated,
+                context: serde_json::json!({ "source": "golden_dataset" }),
+            }),
+    );
+    batch
+}
+
+fn sanitize_tenant_id(tenant_id: &str) -> String {
+    tenant_id
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect()
 }
 
 fn ratio_allows(counters: DatasetCounters, source: &ExampleSource) -> bool {
@@ -193,5 +363,60 @@ mod tests {
         assert_eq!(volume.0.len(), 1);
         assert_eq!(index.0, vec![dataset_index_key("p")]);
         assert_eq!(bus.0, 1);
+    }
+
+    #[test]
+    fn writes_preference_triplets() {
+        let mut volume = Volume(Vec::new());
+        let mut index = Index(Vec::new());
+
+        append_preference_example(
+            &mut volume,
+            &mut index,
+            PreferenceExample {
+                prompt: "p".into(),
+                chosen: "safe".into(),
+                rejected: "unsafe".into(),
+                tenant_id: Some("acme".into()),
+                context: serde_json::json!({}),
+            },
+        )
+        .unwrap();
+
+        assert!(volume.0[0].contains("\"chosen\":\"safe\""));
+        assert_eq!(index.0, vec![dataset_index_key("p")]);
+    }
+
+    #[test]
+    fn builds_tenant_paths_and_mixes_replay_rows() {
+        assert_eq!(
+            tenant_dataset_path("acme/prod"),
+            "/mnt/forge/tenants/acme_prod/dataset_v1.jsonl"
+        );
+
+        let live = vec![TrainingExample {
+            prompt: "live".into(),
+            answer: "a".into(),
+            source: ExampleSource::Direct,
+            context: serde_json::json!({}),
+        }];
+        let golden = vec![GoldenTrainingRow {
+            prompt: "gold".into(),
+            answer: "b".into(),
+            vector_score: 0.9,
+            locked: false,
+        }];
+
+        let batch = mix_with_golden(
+            &live,
+            &golden,
+            ReplayConfig {
+                live_rows: 1,
+                golden_rows: 1,
+            },
+        );
+
+        assert_eq!(batch.len(), 2);
+        assert_eq!(batch[1].prompt, "gold");
     }
 }

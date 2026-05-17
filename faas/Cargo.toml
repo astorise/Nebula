@@ -16,7 +16,13 @@ members = [
   "nebula-quantization-engine",
   "nebula-drift-monitor",
   "nebula-deployment-policy",
-  "nebula-data-anonymizer"
+  "nebula-data-anonymizer",
+  "nebula-dpo-judge",
+  "nebula-tenant-router",
+  "nebula-golden-dataset-manager",
+  "nebula-tool-architect",
+  "nebula-tool-gap-analyzer",
+  "nebula-wasm-foundry"
 ]
 resolver = "2"
 

@@ -622,6 +622,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nebula-dpo-judge"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nebula-drift-monitor"
 version = "0.1.0"
 dependencies = [
@@ -649,6 +658,15 @@ dependencies = [
 
 [[package]]
 name = "nebula-eval-semantic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nebula-golden-dataset-manager"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -715,7 +733,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "nebula-tenant-router"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nebula-tool-architect"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nebula-tool-gap-analyzer"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nebula-training-orchestrator"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "nebula-wasm-foundry"
 version = "0.1.0"
 dependencies = [
  "anyhow",

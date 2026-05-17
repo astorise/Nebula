@@ -19,6 +19,8 @@ export interface TachyonConfigClient {
   listCanaryMetrics(): Promise<CanaryMetric[]>;
   testPrivacySandbox(text: string): Promise<PrivacySandboxResult>;
   setMaxVariant(maxVariant: string): Promise<void>;
+  listTenants(): Promise<TenantSummary[]>;
+  listGoldenRows(): Promise<GoldenRow[]>;
 }
 
 export class StubTachyonConfigClient implements TachyonConfigClient {
@@ -32,6 +34,13 @@ export class StubTachyonConfigClient implements TachyonConfigClient {
   private readonly canaryMetrics: CanaryMetric[] = [
     { modelVersion: "pulsar-base:v2", rolloutTrack: "stable", divergenceRate: 0.012, threshold: 0.04, rollback: false },
     { modelVersion: "pulsar-base:v2-canary", rolloutTrack: "canary", divergenceRate: 0.018, threshold: 0.04, rollback: false }
+  ];
+  private readonly tenants: TenantSummary[] = [
+    { tenantId: "default", rows: 1200, quota: 50_000 },
+    { tenantId: "acme", rows: 420, quota: 50_000 }
+  ];
+  private readonly goldenRows: GoldenRow[] = [
+    { prompt: "Write safe Rust file IO", answer: "Use std::fs::read_to_string and return Result.", locked: true }
   ];
 
   async deployLora(artifact: string): Promise<void> {
@@ -52,6 +61,14 @@ export class StubTachyonConfigClient implements TachyonConfigClient {
 
   async setMaxVariant(maxVariant: string): Promise<void> {
     this.variantCeilings.push(maxVariant);
+  }
+
+  async listTenants(): Promise<TenantSummary[]> {
+    return this.tenants;
+  }
+
+  async listGoldenRows(): Promise<GoldenRow[]> {
+    return this.goldenRows;
   }
 }
 
@@ -74,6 +91,18 @@ export interface PrivacySandboxResult {
   maskedText: string;
   totalMasked: number;
   byRule: Record<string, number>;
+}
+
+export interface TenantSummary {
+  tenantId: string;
+  rows: number;
+  quota: number;
+}
+
+export interface GoldenRow {
+  prompt: string;
+  answer: string;
+  locked: boolean;
 }
 
 export class StubTachyonRouter implements TachyonRouter {
@@ -104,6 +133,26 @@ export class StubTachyonRouter implements TachyonRouter {
 
     if (message.action === "privacy.sandbox.test") {
       return this.testPrivacySandbox(message);
+    }
+
+    if (message.action === "tenant.list") {
+      return this.listTenants(message);
+    }
+
+    if (message.action === "golden.list") {
+      return this.listGoldenRows(message);
+    }
+
+    if (
+      message.action === "alignment.constitution.save" ||
+      message.action === "alignment.preference.review" ||
+      message.action === "tenant.setActive" ||
+      message.action === "tenant.purge" ||
+      message.action === "golden.replayRatio.set" ||
+      message.action === "golden.pin" ||
+      message.action === "foundry.approve"
+    ) {
+      return this.acceptConfigCommand(message);
     }
 
     const routed: TachyonMessage = {
@@ -236,6 +285,50 @@ export class StubTachyonRouter implements TachyonRouter {
       action: "nebula.privacy.sandbox.result",
       requestId: message.requestId,
       payload: result
+    };
+    queueMicrotask(() => this.events.emit("event", event));
+    return event;
+  }
+
+  private async listTenants(message: TachyonMessage): Promise<TachyonMessage> {
+    const tenants = await this.config.listTenants();
+    const event: TachyonMessage = {
+      type: "EVENT",
+      action: "nebula.tenant.list",
+      requestId: message.requestId,
+      payload: {
+        activeTenantId: "default",
+        tenants
+      }
+    };
+    queueMicrotask(() => this.events.emit("event", event));
+    return event;
+  }
+
+  private async listGoldenRows(message: TachyonMessage): Promise<TachyonMessage> {
+    const rows = await this.config.listGoldenRows();
+    const event: TachyonMessage = {
+      type: "EVENT",
+      action: "nebula.golden.rows",
+      requestId: message.requestId,
+      payload: {
+        replayRatio: 0.2,
+        rows
+      }
+    };
+    queueMicrotask(() => this.events.emit("event", event));
+    return event;
+  }
+
+  private acceptConfigCommand(message: TachyonMessage): TachyonMessage {
+    const event: TachyonMessage = {
+      type: "tachyon.config.updated",
+      action: message.action,
+      requestId: message.requestId,
+      payload: {
+        accepted: true,
+        originalPayload: message.payload
+      }
     };
     queueMicrotask(() => this.events.emit("event", event));
     return event;

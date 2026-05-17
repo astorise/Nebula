@@ -244,7 +244,7 @@ mod tests {
             "node-b",
             "root-ca",
             "https://node-b/sync",
-            &[remote_record.id.clone()],
+            std::slice::from_ref(&remote_record.id),
         );
         let mut client = Client {
             called: false,

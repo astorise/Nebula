@@ -91,6 +91,25 @@ export interface PrivacyState {
   byRule: Record<string, number>;
 }
 
+export interface AlignmentState {
+  rules: string[];
+  pendingPreferences: Array<{ prompt: string; chosen: string; rejected: string }>;
+}
+
+export interface TenantState {
+  activeTenantId: string;
+  tenants: Array<{ tenantId: string; rows: number; quota: number }>;
+}
+
+export interface GoldenState {
+  replayRatio: number;
+  rows: Array<{ prompt: string; answer: string; locked: boolean }>;
+}
+
+export interface FoundryState {
+  pendingTools: Array<{ toolId: string; capability: string; status: string }>;
+}
+
 export interface DashboardState {
   connectionStatus: string;
   dataset: DatasetState;
@@ -100,6 +119,10 @@ export interface DashboardState {
   deploymentArtifacts: DeploymentArtifacts;
   canary: CanaryState;
   privacy: PrivacyState;
+  alignment: AlignmentState;
+  tenants: TenantState;
+  golden: GoldenState;
+  foundry: FoundryState;
   drift: DriftState;
   federation: FederationState;
   logs: string[];
@@ -116,7 +139,14 @@ export type WebviewToExtensionMessage =
   | { type: "COMMAND"; action: "DEPLOY_LORA"; payload: { artifact: string } }
   | { type: "COMMAND"; action: "federation.sync.setPaused"; payload: { paused: boolean } }
   | { type: "COMMAND"; action: "deployment.variant.setMax"; payload: { maxVariant: string } }
-  | { type: "COMMAND"; action: "privacy.sandbox.test"; payload: { text: string } };
+  | { type: "COMMAND"; action: "privacy.sandbox.test"; payload: { text: string } }
+  | { type: "COMMAND"; action: "alignment.constitution.save"; payload: { rules: string[] } }
+  | { type: "COMMAND"; action: "alignment.preference.review"; payload: { accepted: boolean; prompt: string } }
+  | { type: "COMMAND"; action: "tenant.setActive"; payload: { tenantId: string } }
+  | { type: "COMMAND"; action: "tenant.purge"; payload: { tenantId: string } }
+  | { type: "COMMAND"; action: "golden.replayRatio.set"; payload: { ratio: number } }
+  | { type: "COMMAND"; action: "golden.pin"; payload: { prompt: string; locked: boolean } }
+  | { type: "COMMAND"; action: "foundry.approve"; payload: { toolId: string } };
 
 export type ExtensionToWebviewMessage =
   | { type: "STATE"; payload: DashboardState }

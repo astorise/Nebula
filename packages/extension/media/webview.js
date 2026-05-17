@@ -32,6 +32,21 @@
           totalMasked: 0,
           byRule: {}
         },
+        alignment: {
+          rules: [],
+          pendingPreferences: []
+        },
+        tenants: {
+          activeTenantId: "default",
+          tenants: []
+        },
+        golden: {
+          replayRatio: 0.2,
+          rows: []
+        },
+        foundry: {
+          pendingTools: []
+        },
         drift: {
           metrics: [],
           triggers: []
@@ -120,6 +135,47 @@
                         </div>
                       `
         ).join("")}
+          </div>
+        </article>
+      </section>
+      <section class="grid">
+        <article>
+          <h2>Tenants</h2>
+          <label>
+            Active context
+            <select id="tenantSelect">
+              ${tenantOptions()}
+            </select>
+          </label>
+          <div class="peers">
+            ${tenantRows()}
+          </div>
+        </article>
+        <article>
+          <h2>Alignment</h2>
+          <label>
+            Constitution
+            <textarea id="constitutionInput">${escapeHtml(state.alignment.rules.join("\n"))}</textarea>
+          </label>
+          <button id="saveConstitution" type="button">Save constitution</button>
+          ${preferenceRows()}
+        </article>
+      </section>
+      <section class="grid">
+        <article>
+          <h2>Golden Vault</h2>
+          <label>
+            Replay ratio
+            <input id="replayRatio" type="number" min="0" max="1" step="0.05" value="${state.golden.replayRatio}">
+          </label>
+          <div class="peers">
+            ${goldenRows()}
+          </div>
+        </article>
+        <article>
+          <h2>Foundry</h2>
+          <div class="peers">
+            ${foundryRows()}
           </div>
         </article>
       </section>
@@ -255,6 +311,70 @@
             payload: { text }
           });
         });
+        document.getElementById("saveConstitution")?.addEventListener("click", () => {
+          const rules = (document.getElementById("constitutionInput")?.value ?? "").split("\n").map((line) => line.trim()).filter((line) => line.length > 0);
+          vscode.postMessage({
+            type: "COMMAND",
+            action: "alignment.constitution.save",
+            payload: { rules }
+          });
+        });
+        document.getElementById("tenantSelect")?.addEventListener("change", (event) => {
+          vscode.postMessage({
+            type: "COMMAND",
+            action: "tenant.setActive",
+            payload: { tenantId: event.target.value }
+          });
+        });
+        document.getElementById("replayRatio")?.addEventListener("change", (event) => {
+          vscode.postMessage({
+            type: "COMMAND",
+            action: "golden.replayRatio.set",
+            payload: { ratio: Number.parseFloat(event.target.value) }
+          });
+        });
+        document.querySelectorAll("[data-preference]").forEach((button) => {
+          button.addEventListener("click", () => {
+            vscode.postMessage({
+              type: "COMMAND",
+              action: "alignment.preference.review",
+              payload: {
+                accepted: button.dataset.preference === "accept",
+                prompt: button.dataset.prompt ?? ""
+              }
+            });
+          });
+        });
+        document.querySelectorAll("[data-purge-tenant]").forEach((button) => {
+          button.addEventListener("click", () => {
+            vscode.postMessage({
+              type: "COMMAND",
+              action: "tenant.purge",
+              payload: { tenantId: button.dataset.purgeTenant ?? "" }
+            });
+          });
+        });
+        document.querySelectorAll("[data-golden-pin]").forEach((button) => {
+          button.addEventListener("click", () => {
+            vscode.postMessage({
+              type: "COMMAND",
+              action: "golden.pin",
+              payload: {
+                prompt: button.dataset.prompt ?? "",
+                locked: button.dataset.goldenPin !== "true"
+              }
+            });
+          });
+        });
+        document.querySelectorAll("[data-foundry-approve]").forEach((button) => {
+          button.addEventListener("click", () => {
+            vscode.postMessage({
+              type: "COMMAND",
+              action: "foundry.approve",
+              payload: { toolId: button.dataset.foundryApprove ?? "" }
+            });
+          });
+        });
       }
       function step(value, label) {
         const current = ["waiting", "backward", "merge", "published"].indexOf(state.trainingStatus);
@@ -336,6 +456,69 @@
         ).join("")}
     </div>
   `;
+      }
+      function tenantOptions() {
+        const tenants = state.tenants.tenants.length === 0 ? [{ tenantId: state.tenants.activeTenantId, rows: 0, quota: 5e4 }] : state.tenants.tenants;
+        return tenants.map(
+          (tenant) => `<option value="${escapeHtml(tenant.tenantId)}" ${tenant.tenantId === state.tenants.activeTenantId ? "selected" : ""}>${escapeHtml(tenant.tenantId)}</option>`
+        ).join("");
+      }
+      function tenantRows() {
+        if (state.tenants.tenants.length === 0) {
+          return `<p class="muted">No tenant metrics yet</p>`;
+        }
+        return state.tenants.tenants.map(
+          (tenant) => `
+        <div class="peer">
+          <span>${escapeHtml(tenant.tenantId)} ${Math.round(tenant.rows / tenant.quota * 100)}%</span>
+          <button data-purge-tenant="${escapeHtml(tenant.tenantId)}" type="button">Purge</button>
+        </div>
+      `
+        ).join("");
+      }
+      function preferenceRows() {
+        if (state.alignment.pendingPreferences.length === 0) {
+          return `<p class="muted">No pending preferences</p>`;
+        }
+        return state.alignment.pendingPreferences.map(
+          (item) => `
+        <div class="review">
+          <strong>${escapeHtml(item.prompt)}</strong>
+          <pre>${escapeHtml(item.chosen)}</pre>
+          <pre>${escapeHtml(item.rejected)}</pre>
+          <div class="actions">
+            <button data-preference="accept" data-prompt="${escapeHtml(item.prompt)}" type="button">Accept</button>
+            <button data-preference="reject" data-prompt="${escapeHtml(item.prompt)}" type="button">Reject</button>
+          </div>
+        </div>
+      `
+        ).join("");
+      }
+      function goldenRows() {
+        if (state.golden.rows.length === 0) {
+          return `<p class="muted">No golden rows promoted</p>`;
+        }
+        return state.golden.rows.map(
+          (row) => `
+        <div class="peer">
+          <span>${escapeHtml(row.prompt)}</span>
+          <button data-golden-pin="${row.locked}" data-prompt="${escapeHtml(row.prompt)}" type="button">${row.locked ? "Unlock" : "Lock"}</button>
+        </div>
+      `
+        ).join("");
+      }
+      function foundryRows() {
+        if (state.foundry.pendingTools.length === 0) {
+          return `<p class="muted">No tool approvals pending</p>`;
+        }
+        return state.foundry.pendingTools.map(
+          (tool) => `
+        <div class="peer">
+          <span>${escapeHtml(tool.capability)} ${escapeHtml(tool.status)}</span>
+          <button data-foundry-approve="${escapeHtml(tool.toolId)}" type="button">Approve</button>
+        </div>
+      `
+        ).join("");
       }
       function driftRows(metrics, empty) {
         if (metrics.length === 0) {
@@ -428,6 +611,8 @@
   .rollback { color: var(--vscode-charts-red); }
   .logs { display: grid; gap: 6px; max-height: 260px; overflow: auto; }
   .logs p { font-family: var(--vscode-editor-font-family); font-size: 12px; padding: 6px; background: var(--vscode-input-background); }
+  .review { border: 1px solid var(--vscode-panel-border); padding: 8px; display: grid; gap: 8px; }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; }
 `;
       document.head.appendChild(style);
       render();

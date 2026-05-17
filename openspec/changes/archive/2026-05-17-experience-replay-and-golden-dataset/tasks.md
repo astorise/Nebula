@@ -1,0 +1,4 @@
+- [x] `task-1`: Create `nebula-golden-dataset-manager` to promote stable rows into the golden dataset.
+- [x] `task-2`: Update `nebula-dataset-forge` to mix live rows with golden replay rows.
+- [x] `task-3`: Add tenant-scoped golden dataset path helpers and vector namespace semantics.
+- [x] `task-4`: Build the Golden Vault dashboard section with row locking and replay ratio controls.

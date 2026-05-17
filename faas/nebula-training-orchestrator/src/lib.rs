@@ -9,6 +9,8 @@ pub const QUANTIZATION_COMPLETE_TOPIC: &str = "nebula.quantization.completed";
 pub struct TrainingReadyEvent {
     pub dataset_path: String,
     pub examples: usize,
+    #[serde(default)]
+    pub tenant_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -18,6 +20,8 @@ pub struct TrainingConfig {
     pub oci_ref: String,
     pub lora_dim: usize,
     pub lora_alpha: usize,
+    #[serde(default)]
+    pub tenant_id: Option<String>,
 }
 
 impl Default for TrainingConfig {
@@ -28,8 +32,28 @@ impl Default for TrainingConfig {
             oci_ref: "oci://localhost:5000/pulsar-models/base:v2".into(),
             lora_dim: 16,
             lora_alpha: 32,
+            tenant_id: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DpoTrainingConfig {
+    pub beta: f32,
+}
+
+impl Default for DpoTrainingConfig {
+    fn default() -> Self {
+        Self { beta: 0.1 }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DpoForwardPass {
+    pub policy_chosen_logp: f32,
+    pub policy_rejected_logp: f32,
+    pub reference_chosen_logp: f32,
+    pub reference_rejected_logp: f32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -88,8 +112,12 @@ pub fn handle_training_ready(
     publisher: &mut impl ArtifactPublisher,
     notifier: &mut impl UiNotifier,
     event: TrainingReadyEvent,
-    config: TrainingConfig,
+    mut config: TrainingConfig,
 ) -> Result<TrainingCompleteEvent> {
+    if let Some(tenant_id) = &event.tenant_id {
+        config.tenant_id = Some(tenant_id.clone());
+        config.oci_ref = tenant_oci_ref(&config.oci_ref, tenant_id);
+    }
     let adapter = trainer.train_lora(&event.dataset_path, &config)?;
     let merged_model = trainer.merge_adapter(&adapter, &config)?;
     let artifact_ref = publisher.publish_with_wkg(&merged_model, &config.oci_ref)?;
@@ -100,6 +128,32 @@ pub fn handle_training_ready(
     };
     notifier.notify(TRAINING_COMPLETE_TOPIC, &complete)?;
     Ok(complete)
+}
+
+pub fn compute_dpo_loss(pass: DpoForwardPass, config: DpoTrainingConfig) -> f32 {
+    let policy_margin = pass.policy_chosen_logp - pass.policy_rejected_logp;
+    let reference_margin = pass.reference_chosen_logp - pass.reference_rejected_logp;
+    let logits = config.beta * (policy_margin - reference_margin);
+    (1.0 + (-logits).exp()).ln()
+}
+
+pub fn tenant_oci_ref(base_ref: &str, tenant_id: &str) -> String {
+    let safe_tenant = tenant_id
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+
+    if let Some((prefix, tag)) = base_ref.rsplit_once(':') {
+        format!("{prefix}:{tag}-{safe_tenant}")
+    } else {
+        format!("{base_ref}-{safe_tenant}")
+    }
 }
 
 pub fn handle_quantization_completed(
@@ -189,6 +243,7 @@ mod tests {
             TrainingReadyEvent {
                 dataset_path: "dataset_v1.jsonl".into(),
                 examples: 500,
+                tenant_id: None,
             },
             TrainingConfig::default(),
         )
@@ -224,6 +279,29 @@ mod tests {
                 ("org.opencontainers.image.title".into(), "q4_k".into()),
                 ("tachyon.mesh/min-vram".into(), "4GB".into())
             ]
+        );
+    }
+
+    #[test]
+    fn computes_dpo_loss_from_sequential_forward_passes() {
+        let loss = compute_dpo_loss(
+            DpoForwardPass {
+                policy_chosen_logp: -0.2,
+                policy_rejected_logp: -1.1,
+                reference_chosen_logp: -0.4,
+                reference_rejected_logp: -0.9,
+            },
+            DpoTrainingConfig::default(),
+        );
+
+        assert!(loss < 0.70);
+    }
+
+    #[test]
+    fn scopes_oci_ref_by_tenant() {
+        assert_eq!(
+            tenant_oci_ref("oci://localhost:5000/pulsar-lora:v4", "acme/prod"),
+            "oci://localhost:5000/pulsar-lora:v4-acme-prod"
         );
     }
 }
