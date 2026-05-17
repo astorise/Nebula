@@ -132,6 +132,7 @@ mod tests {
     }
 
     #[test]
+    // spec: dpo-judge
     fn forwards_constitutional_preference_pair() {
         let mut sink = Sink(Vec::new());
         let pair = judge_and_forward(
@@ -151,6 +152,7 @@ mod tests {
     }
 
     #[test]
+    // spec: dpo-judge
     fn rejects_case_variants_without_matching_identifiers() {
         let rules = vec![ConstitutionRule {
             id: "rust-safety".into(),

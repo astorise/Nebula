@@ -205,6 +205,7 @@ mod tests {
     }
 
     #[test]
+    // spec: deployment-policy
     fn pushes_tagged_canary_metric_and_recommends_rollback() {
         let mut store = Store::default();
         let mut metrics = Metrics(Vec::new());
@@ -244,6 +245,7 @@ mod tests {
     }
 
     #[test]
+    // spec: deployment-policy
     fn stable_track_never_requests_canary_rollback() {
         let decision = evaluate_rollout(
             "pulsar-base:v2",
@@ -261,6 +263,7 @@ mod tests {
     }
 
     #[test]
+    // spec: deployment-policy
     fn template_contains_cognitive_divergence_rule() {
         let template = render_tachyon_canary_template("pulsar-swarm-rollout", 0.04);
 

@@ -210,6 +210,7 @@ mod tests {
     }
 
     #[test]
+    // spec: eval-ast
     fn matching_structure_is_ignored() {
         let request = AstEvaluationRequest {
             prompt: "p".into(),

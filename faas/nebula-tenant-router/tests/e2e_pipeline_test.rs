@@ -39,6 +39,7 @@ impl GoldenStore for Store {
 }
 
 #[test]
+// spec: tenant-router
 fn routes_registered_payload_into_golden_replay_batch() {
     let mut context = BTreeMap::new();
     context.insert("x-tenant-id".into(), "acme".into());

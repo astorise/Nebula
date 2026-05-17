@@ -181,6 +181,7 @@ mod tests {
     }
 
     #[test]
+    // spec: curriculum-generator
     fn injects_correlation_header() {
         let mut bus = Bus(Vec::new());
         let events = generate_and_inject(
@@ -199,6 +200,7 @@ mod tests {
     }
 
     #[test]
+    // spec: curriculum-generator
     fn drift_event_generates_targeted_curriculum() {
         let mut bus = Bus(Vec::new());
         let events = generate_drift_curriculum(

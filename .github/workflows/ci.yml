@@ -81,6 +81,10 @@ jobs:
       - name: Check dependency policy
         run: cargo deny check
 
+      - name: Verify OpenSpec traceability
+        working-directory: .
+        run: bash scripts/verify_openspec.sh
+
       - name: Clippy Wasm components
         run: >
           cargo clippy

@@ -352,6 +352,7 @@ mod tests {
     }
 
     #[test]
+    // spec: dataset-forge
     fn appends_jsonl_and_emits_threshold() {
         let mut counters = Counters::default();
         let mut volume = Volume(Vec::new());
@@ -373,6 +374,7 @@ mod tests {
     }
 
     #[test]
+    // spec: dataset-forge
     fn writes_preference_triplets() {
         let mut volume = Volume(Vec::new());
         let mut index = Index(Vec::new());
@@ -395,12 +397,14 @@ mod tests {
     }
 
     #[test]
+    // spec: dataset-forge
     #[should_panic(expected = "tenant id must be a valid UUID")]
     fn tenant_path_rejects_unresolved_tenant_strings() {
         let _ = tenant_dataset_path("acme/prod");
     }
 
     #[test]
+    // spec: dataset-forge
     fn builds_tenant_paths_and_mixes_replay_rows() {
         let tenant_id = nebula_tenant_core::deterministic_test_tenant("acme/prod").to_string();
         assert_eq!(

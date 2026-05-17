@@ -166,6 +166,7 @@ impl DatasetEventBus for ReadyBus {
 }
 
 #[test]
+// spec: economic-governor
 fn e2e_finops_pipeline_forwards_only_first_duplicate_to_dataset() {
     let tenant_id = deterministic_test_tenant("acme");
     let mut cache = Vec::new();

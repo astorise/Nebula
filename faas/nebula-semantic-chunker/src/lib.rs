@@ -138,6 +138,7 @@ mod tests {
     }
 
     #[test]
+    // spec: semantic-chunker
     fn keeps_hierarchical_heading_context() {
         let event = MarkdownReadyEvent {
             source_path: "/docs/a.md".into(),
@@ -152,6 +153,7 @@ mod tests {
     }
 
     #[test]
+    // spec: semantic-chunker
     fn embeds_and_persists_chunks() {
         let event = MarkdownReadyEvent {
             source_path: "/docs/a.md".into(),

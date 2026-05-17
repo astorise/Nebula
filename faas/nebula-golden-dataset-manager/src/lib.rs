@@ -79,6 +79,7 @@ mod tests {
     }
 
     #[test]
+    // spec: golden-dataset-manager
     fn promotes_rows_after_stable_production_window() {
         let mut store = Store::default();
         let promoted = promote_if_stable(

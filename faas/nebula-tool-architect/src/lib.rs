@@ -83,6 +83,7 @@ mod tests {
     }
 
     #[test]
+    // spec: tool-architect
     fn extracts_generated_source_and_manifest() {
         let tool = architect_tool(
             &Model,

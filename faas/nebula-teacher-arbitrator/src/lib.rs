@@ -176,6 +176,7 @@ mod tests {
     }
 
     #[test]
+    // spec: teacher-arbitrator
     fn runs_layer_by_layer_before_publish() {
         let task = ArbitrationTask {
             prompt: "p".into(),

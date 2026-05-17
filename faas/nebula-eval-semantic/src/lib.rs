@@ -121,6 +121,7 @@ mod tests {
     }
 
     #[test]
+    // spec: eval-semantic
     fn low_similarity_diverges() {
         let request = SemanticEvaluationRequest {
             prompt: "p".into(),

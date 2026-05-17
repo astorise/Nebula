@@ -187,12 +187,14 @@ mod tests {
     }
 
     #[test]
+    // spec: crdt-merger
     fn uses_prompt_hash_as_stable_row_id() {
         assert_eq!(deterministic_row_id("same"), deterministic_row_id("same"));
         assert_ne!(deterministic_row_id("same"), deterministic_row_id("other"));
     }
 
     #[test]
+    // spec: crdt-merger
     fn skips_existing_rows() {
         let existing = deterministic_row_id("p");
         let mut store = Store {
@@ -210,6 +212,7 @@ mod tests {
     }
 
     #[test]
+    // spec: crdt-merger
     fn appends_unique_rows_and_triggers_training() {
         let mut store = Store::default();
         let mut bus = Bus(0);
@@ -233,6 +236,7 @@ mod tests {
     }
 
     #[test]
+    // spec: crdt-merger
     fn prefixes_crdt_key_with_tenant_namespace() {
         let key = tenant_crdt_key("acme/prod", "prompt");
         assert!(key.starts_with("tenant:acme_prod:crdt:hash:"));

@@ -114,6 +114,7 @@ mod tests {
     }
 
     #[test]
+    // spec: semantic-deduplicator
     fn marks_near_identical_prompt_as_duplicate() {
         let tenant_id = deterministic_test_tenant("acme");
         let decision = classify_divergence(
@@ -135,6 +136,7 @@ mod tests {
     }
 
     #[test]
+    // spec: semantic-deduplicator
     fn computes_cosine_similarity() {
         assert_eq!(cosine_similarity(&[1.0, 0.0], &[1.0, 0.0]).unwrap(), 1.0);
         assert_eq!(cosine_similarity(&[1.0, 0.0], &[0.0, 1.0]).unwrap(), 0.0);
@@ -142,6 +144,7 @@ mod tests {
     }
 
     #[test]
+    // spec: semantic-deduplicator
     fn flood_of_identical_queries_forwards_only_first_request() {
         let tenant_id = deterministic_test_tenant("acme");
         let events = (0..10)
@@ -170,6 +173,7 @@ mod tests {
     }
 
     #[test]
+    // spec: semantic-deduplicator
     fn flood_test_keeps_distinct_prompts_unique() {
         let tenant_id = deterministic_test_tenant("acme");
         let mut cache = vec![CachedEmbedding {

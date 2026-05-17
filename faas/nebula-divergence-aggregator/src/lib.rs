@@ -62,6 +62,7 @@ mod tests {
     }
 
     #[test]
+    // spec: divergence-aggregator
     fn persists_only_divergent_results() {
         let mut store = Store(Vec::new());
         let result = EvaluationResult {

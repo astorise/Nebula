@@ -214,6 +214,7 @@ mod tests {
     }
 
     #[test]
+    // spec: p2p-sync-agent
     fn publishes_deterministic_manifest() {
         let mut store = Store {
             records: vec![record("p1", "r1"), record("p2", "r2")],
@@ -235,6 +236,7 @@ mod tests {
     }
 
     #[test]
+    // spec: p2p-sync-agent
     fn pulls_and_inserts_missing_remote_records() {
         let mut store = Store {
             records: vec![record("p1", "r1")],
@@ -260,6 +262,7 @@ mod tests {
     }
 
     #[test]
+    // spec: p2p-sync-agent
     fn rejects_untrusted_manifest_without_delta_request() {
         let mut store = Store::default();
         let mut client = Client {

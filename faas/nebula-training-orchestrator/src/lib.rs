@@ -231,6 +231,7 @@ mod tests {
     }
 
     #[test]
+    // spec: training-orchestrator
     fn trains_merges_publishes_and_notifies() {
         let mut trainer = TrainerStub;
         let mut publisher = PublisherStub;
@@ -257,6 +258,7 @@ mod tests {
     }
 
     #[test]
+    // spec: training-orchestrator
     fn builds_quantized_oci_index_with_vram_annotations() {
         let event = QuantizationCompletedEvent {
             source_artifact: "fp16".into(),
@@ -283,6 +285,7 @@ mod tests {
     }
 
     #[test]
+    // spec: training-orchestrator
     fn computes_dpo_loss_from_sequential_forward_passes() {
         let loss = compute_dpo_loss(
             DpoForwardPass {
@@ -298,6 +301,7 @@ mod tests {
     }
 
     #[test]
+    // spec: training-orchestrator
     fn scopes_oci_ref_by_tenant() {
         assert_eq!(
             tenant_oci_ref("oci://localhost:5000/pulsar-lora:v4", "acme/prod"),

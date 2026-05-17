@@ -78,6 +78,8 @@ mod tests {
     }
 
     #[test]
+    // spec: wasm-foundry
+    // spec: deployment-artifacts
     fn builds_and_pushes_wasm_artifact() {
         let response = build_tool(
             &mut Runner,
@@ -97,6 +99,7 @@ mod tests {
     }
 
     #[test]
+    // spec: wasm-foundry
     fn detects_only_structured_cargo_errors() {
         assert!(!cargo_diagnostics_have_error(&["plain text error".into()]));
         assert!(cargo_diagnostics_have_error(&[

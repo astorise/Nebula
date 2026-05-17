@@ -177,6 +177,7 @@ mod tests {
     }
 
     #[test]
+    // spec: drift-monitor
     fn emits_drift_when_confidence_drops_below_threshold() {
         let mut store = Store::default();
         let mut bus = Bus(Vec::new());
@@ -207,6 +208,7 @@ mod tests {
     }
 
     #[test]
+    // spec: drift-monitor
     fn ignores_topics_with_too_few_samples() {
         let mut store = Store::default();
         let mut bus = Bus(Vec::new());

@@ -114,6 +114,7 @@ mod tests {
     use super::*;
 
     #[test]
+    // spec: telemetry-gateway
     fn routes_code_to_ast() {
         let event = route_triplet(InferenceTriplet {
             prompt: "write rust".into(),
@@ -126,6 +127,7 @@ mod tests {
     }
 
     #[test]
+    // spec: telemetry-gateway
     fn routes_free_text_to_semantic() {
         let event = route_triplet(InferenceTriplet {
             prompt: "reason".into(),
@@ -138,6 +140,7 @@ mod tests {
     }
 
     #[test]
+    // spec: telemetry-gateway
     fn encodes_grpc_frame_for_ast_microvm() {
         let frame = encode_grpc_frame(&AstEvaluationRequest {
             language: "rust".into(),
@@ -150,6 +153,7 @@ mod tests {
     }
 
     #[test]
+    // spec: telemetry-gateway
     fn rejects_raw_telemetry_topic() {
         struct Bus;
 

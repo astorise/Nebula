@@ -73,8 +73,13 @@ pub fn default_rules() -> Vec<MaskRule> {
                     .into(),
         },
         MaskRule {
+            name: "ipv6".into(),
+            token: "<IPV6>".into(),
+            pattern: r"\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b".into(),
+        },
+        MaskRule {
             name: "credit_card".into(),
-            token: "<PAYMENT_CARD>".into(),
+            token: "<CREDIT_CARD>".into(),
             pattern: r"\b(?:\d[ -]*?){13,19}\b".into(),
         },
     ]
@@ -147,6 +152,11 @@ fn compile_rules(rules: &[MaskRule]) -> Result<Vec<(String, String, Regex)>> {
 fn mask_text(text: &str, rules: &[(String, String, Regex)], audit: &mut MaskAudit) -> String {
     let mut masked = text.to_string();
     for (name, token, regex) in rules {
+        if name == "credit_card" {
+            masked = mask_credit_cards(&masked, token, regex, audit);
+            continue;
+        }
+
         let count = regex.find_iter(&masked).count();
         if count == 0 {
             continue;
@@ -157,6 +167,60 @@ fn mask_text(text: &str, rules: &[(String, String, Regex)], audit: &mut MaskAudi
         masked = regex.replace_all(&masked, token.as_str()).into_owned();
     }
     masked
+}
+
+fn mask_credit_cards(text: &str, token: &str, regex: &Regex, audit: &mut MaskAudit) -> String {
+    let mut masked = String::with_capacity(text.len());
+    let mut last_end = 0;
+    let mut count = 0;
+
+    for candidate in regex.find_iter(text) {
+        let digits: String = candidate
+            .as_str()
+            .chars()
+            .filter(|character| character.is_ascii_digit())
+            .collect();
+
+        if luhn_check(&digits) {
+            masked.push_str(&text[last_end..candidate.start()]);
+            masked.push_str(token);
+            last_end = candidate.end();
+            count += 1;
+        }
+    }
+
+    if count == 0 {
+        return text.to_string();
+    }
+
+    masked.push_str(&text[last_end..]);
+    audit.total_masked += count;
+    *audit.by_rule.entry("credit_card".into()).or_insert(0) += count;
+    masked
+}
+
+fn luhn_check(digits: &str) -> bool {
+    if !(13..=19).contains(&digits.len()) || !digits.chars().all(|digit| digit.is_ascii_digit()) {
+        return false;
+    }
+
+    let sum: u32 = digits
+        .bytes()
+        .rev()
+        .enumerate()
+        .map(|(index, byte)| {
+            let mut value = u32::from(byte - b'0');
+            if index % 2 == 1 {
+                value *= 2;
+                if value > 9 {
+                    value -= 9;
+                }
+            }
+            value
+        })
+        .sum();
+
+    sum.is_multiple_of(10)
 }
 
 #[cfg(test)]
@@ -181,6 +245,7 @@ mod tests {
     }
 
     #[test]
+    // spec: data-anonymizer
     fn masks_default_sensitive_entities() {
         let triplet = InferenceTriplet {
             prompt: "Email john@example.com using Bearer abcdefghijklmnop".into(),
@@ -201,6 +266,7 @@ mod tests {
     }
 
     #[test]
+    // spec: data-anonymizer
     fn forwards_sanitized_payload_and_metrics() {
         let raw = serde_json::to_vec(&InferenceTriplet {
             prompt: "john@example.com".into(),
@@ -217,5 +283,34 @@ mod tests {
 
         assert_eq!(bus.0[0].prompt, "<EMAIL>");
         assert_eq!(metrics.0[0], sanitized.audit);
+    }
+
+    #[test]
+    // spec: data-anonymizer
+    fn masks_only_luhn_valid_credit_cards() {
+        let (masked, audit) = sandbox_text(
+            "valid 4111 1111 1111 1111 invalid 4111 1111 1111 1112",
+            &default_rules(),
+        )
+        .unwrap();
+
+        assert!(masked.contains("valid <CREDIT_CARD>"));
+        assert!(masked.contains("invalid 4111 1111 1111 1112"));
+        assert_eq!(audit.by_rule.get("credit_card"), Some(&1));
+    }
+
+    #[test]
+    // spec: data-anonymizer
+    fn masks_uuid_and_ipv6_before_numeric_card_candidates() {
+        let (masked, audit) = sandbox_text(
+            "trace 550e8400-e29b-41d4-a716-446655440000 host 2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+            &default_rules(),
+        )
+        .unwrap();
+
+        assert!(masked.contains("<UUID>"));
+        assert!(masked.contains("<IPV6>"));
+        assert!(!masked.contains("<CREDIT_CARD>"));
+        assert_eq!(audit.by_rule.get("credit_card"), None);
     }
 }

@@ -53,6 +53,7 @@ mod tests {
     use super::*;
 
     #[test]
+    // spec: tool-gap-analyzer
     fn requires_approval_in_human_loop_mode() {
         let decision = evaluate_gate(
             &ToolSynthesisConfig {

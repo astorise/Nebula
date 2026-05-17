@@ -138,6 +138,7 @@ mod tests {
     }
 
     #[test]
+    // spec: economic-governor
     fn reserves_when_under_budget() {
         let tenant_id = deterministic_test_tenant("acme");
         let mut store = Store {
@@ -165,6 +166,7 @@ mod tests {
     }
 
     #[test]
+    // spec: economic-governor
     fn drops_when_budget_exhausted() {
         let tenant_id = deterministic_test_tenant("acme");
         let mut store = Store {
@@ -191,6 +193,7 @@ mod tests {
     }
 
     #[test]
+    // spec: economic-governor
     fn reconciliation_debits_and_credits_estimate_delta() {
         let tenant_id = deterministic_test_tenant("acme");
         let mut store = Store {

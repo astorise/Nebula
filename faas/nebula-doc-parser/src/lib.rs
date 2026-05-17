@@ -117,6 +117,7 @@ mod tests {
     }
 
     #[test]
+    // spec: doc-parser
     fn converts_plain_text_to_markdown() {
         let mut client = Client(b"ARCHITECTURE\n\nBody paragraph".to_vec());
         let mut bus = Bus(0);

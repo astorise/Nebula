@@ -1,8 +1,7 @@
-# data-anonymizer Specification
+# data-anonymizer Delta
 
-## Purpose
-TBD - created by archiving change data-privacy-and-anonymization. Update Purpose after archive.
-## Requirements
+## MODIFIED Requirements
+
 ### Requirement: Data anonymizer masks sensitive telemetry
 The data anonymizer SHALL match UUID and IP address rules before evaluating credit-card-like numeric strings, and SHALL only replace a credit-card candidate with `<CREDIT_CARD>` when its digits pass the Luhn checksum.
 
@@ -20,22 +19,3 @@ The data anonymizer SHALL match UUID and IP address rules before evaluating cred
 - **WHEN** text contains UUID or IPv6 values before credit-card-like candidates are evaluated
 - **THEN** UUID and IPv6 values are masked by their dedicated rules
 - **AND** they are not counted as credit-card masks
-### Requirement: Data anonymizer provides compliance presets
-
-The anonymizer SHALL include default compliance rules for tokens, PII, and financial data.
-
-#### Scenario: Default rules are loaded
-
-- **WHEN** the anonymizer starts without custom rules
-- **THEN** it can mask emails, bearer tokens, JWT-like tokens, IPv4 addresses, UUIDs, and credit card-like numbers
-
-### Requirement: Data anonymizer reports masking audit metrics
-
-The anonymizer SHALL report how many entities were masked per event.
-
-#### Scenario: Entities are masked
-
-- **GIVEN** a telemetry payload contains sensitive entities
-- **WHEN** anonymization completes
-- **THEN** the anonymizer publishes `nebula.privacy.entities_masked`
-- **AND** the metric includes per-rule counts

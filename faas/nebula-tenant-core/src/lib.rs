@@ -132,6 +132,7 @@ mod tests {
     }
 
     #[test]
+    // spec: tenant-core
     fn resolves_only_registered_tenants() {
         assert!(resolve_tenant("acme", &Registry).is_ok());
         assert!(matches!(
@@ -141,6 +142,7 @@ mod tests {
     }
 
     #[test]
+    // spec: tenant-core
     fn propagates_registry_errors_as_unavailable() {
         struct Down;
         impl TenantRegistry for Down {

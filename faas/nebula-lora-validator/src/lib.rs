@@ -252,6 +252,7 @@ mod tests {
     }
 
     #[test]
+    // spec: lora-validator
     fn emits_success_when_all_prompts_converge() {
         let mut store = Store(vec![FailedPrompt {
             prompt: "write rust".into(),
@@ -279,6 +280,7 @@ mod tests {
     }
 
     #[test]
+    // spec: lora-validator
     fn emits_failure_when_any_prompt_still_diverges() {
         let mut store = Store(vec![FailedPrompt {
             prompt: "write rust".into(),
@@ -306,6 +308,7 @@ mod tests {
     }
 
     #[test]
+    // spec: lora-validator
     fn decodes_ast_microvm_grpc_response() {
         let response = AstEvaluationResponse {
             diverged: false,

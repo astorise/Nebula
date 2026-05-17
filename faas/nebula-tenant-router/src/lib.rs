@@ -96,6 +96,7 @@ mod tests {
     }
 
     #[test]
+    // spec: tenant-router
     fn routes_registered_tenant() {
         let mut context = BTreeMap::new();
         context.insert("x-tenant-id".into(), "acme".into());
@@ -115,6 +116,7 @@ mod tests {
     }
 
     #[test]
+    // spec: tenant-router
     fn drops_unregistered_tenant() {
         let mut context = BTreeMap::new();
         context.insert("x-tenant-id".into(), "acme/prod".into());
@@ -133,6 +135,7 @@ mod tests {
     }
 
     #[test]
+    // spec: tenant-router
     fn permissive_mode_falls_back_to_default_tenant() {
         let mut context = BTreeMap::new();
         context.insert("x-tenant-id".into(), "unregistered".into());
