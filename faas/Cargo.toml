@@ -50,6 +50,7 @@ tokio = { version = "1.41", features = ["macros", "net", "rt-multi-thread", "sig
 tokio-stream = { version = "0.1", features = ["net"] }
 tonic = "0.12"
 tree-sitter = "0.22"
+url = "2.5"
 
 [workspace.lints.clippy]
 unwrap_used = "deny"

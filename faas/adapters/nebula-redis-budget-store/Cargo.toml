@@ -12,5 +12,9 @@ nebula-tenant-core = { path = "../../nebula-tenant-core" }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 redis.workspace = true
 
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+testcontainers = { version = "0.27.3", features = ["blocking"] }
+testcontainers-modules = { version = "0.15.0", features = ["redis"] }
+
 [lints]
 workspace = true

@@ -10,13 +10,16 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "check": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run src",
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "wormhole-tunnel": "file:vendor/wormhole-tunnel",
+    "@tachyon-mesh/wormhole": "^1.0.0",
     "ws": "^8.17.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.6",
+    "vitest": "^4.1.6",
     "@types/ws": "^8.5.10"
   }
 }

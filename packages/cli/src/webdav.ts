@@ -39,7 +39,7 @@ export async function handleWebDav(req: IncomingMessage, res: ServerResponse, co
     return;
   }
 
-  const targetPath = resolveDavPath(context.docsRoot, req.url ?? "/");
+  const targetPath = await resolveDavPath(context.docsRoot, req.url ?? "/");
   if (!targetPath) {
     res.writeHead(403);
     res.end("Forbidden");
@@ -78,16 +78,38 @@ export async function handleWebDav(req: IncomingMessage, res: ServerResponse, co
   }
 }
 
-function resolveDavPath(root: string, requestUrl: string): string | null {
-  const decodedPath = decodeURIComponent(new URL(requestUrl, "https://nebula.local").pathname);
+export async function resolveDavPath(root: string, requestUrl: string): Promise<string | null> {
+  const rawPath = requestUrl.match(/^[a-z][a-z0-9+.-]*:\/\//i)
+    ? new URL(requestUrl).pathname
+    : requestUrl.split(/[?#]/, 1)[0] || "/";
+  const decodedPath = decodeURIComponent(rawPath);
   const resolved = path.resolve(root, `.${decodedPath}`);
   const relative = path.relative(root, resolved);
 
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+  if (!isInsideRoot(relative)) {
+    return null;
+  }
+
+  const realRoot = await fs.realpath(root);
+  let realTarget: string;
+  try {
+    realTarget = await fs.realpath(resolved);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      return resolved;
+    }
+    throw error;
+  }
+
+  if (!isInsideRoot(path.relative(realRoot, realTarget))) {
     return null;
   }
 
   return resolved;
+}
+
+function isInsideRoot(relativePath: string): boolean {
+  return relativePath === "" || (!relativePath.startsWith("..") && !path.isAbsolute(relativePath));
 }
 
 async function handlePropfind(
@@ -116,7 +138,7 @@ async function handlePropfind(
   res.end(body);
 }
 
-function renderMultistatus(root: string, entries: Array<{ filePath: string; stat: Awaited<ReturnType<typeof fs.stat>> }>): string {
+export function renderMultistatus(root: string, entries: Array<{ filePath: string; stat: Awaited<ReturnType<typeof fs.stat>> }>): string {
   const responses = entries.map(({ filePath, stat }) => {
     const href = `/${path.relative(root, filePath).replaceAll(path.sep, "/")}`;
     const normalizedHref = href === "/" ? "/" : encodeURI(href);

@@ -9,7 +9,7 @@
     "build": "npm run build --workspaces",
     "check": "npm run check --workspaces",
     "lint": "npm run check",
-    "test": "npm run check"
+    "test": "npm run test --workspaces --if-present"
   },
   "devDependencies": {
     "@types/node": "^20.12.12",

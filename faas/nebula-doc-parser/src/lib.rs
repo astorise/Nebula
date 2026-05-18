@@ -2,6 +2,7 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use url::Url;
 
 pub const INPUT_TOPIC: &str = "nebula.fs.file_updated";
 pub const OUTPUT_TOPIC: &str = "nebula.doc.markdown_ready";
@@ -35,6 +36,7 @@ pub fn ingest_file(
     bus: &mut impl EventBus,
     event: FileUpdatedEvent,
 ) -> Result<MarkdownReadyEvent> {
+    validate_tunnel_host(&event.tunnel_host)?;
     let bytes = client.fetch(&event.tunnel_host, &event.path)?;
     let markdown = parse_document_to_markdown(&bytes, &event.mime_type)?;
     let output = MarkdownReadyEvent {
@@ -46,6 +48,30 @@ pub fn ingest_file(
 
     bus.publish(OUTPUT_TOPIC, &output)?;
     Ok(output)
+}
+
+pub fn validate_tunnel_host(tunnel_host: &str) -> Result<()> {
+    let url = Url::parse(tunnel_host)
+        .map_err(|error| anyhow!("InvalidTunnelEndpoint: invalid URL: {error}"))?;
+    match url.scheme() {
+        "http" | "https" => {}
+        other => {
+            return Err(anyhow!(
+                "InvalidTunnelEndpoint: unsupported tunnel scheme: {other}"
+            ));
+        }
+    }
+
+    let host = url
+        .host_str()
+        .ok_or_else(|| anyhow!("InvalidTunnelEndpoint: missing tunnel host"))?;
+    if !host.ends_with(".wormhole.internal") {
+        return Err(anyhow!(
+            "InvalidTunnelEndpoint: tunnel host must end with .wormhole.internal"
+        ));
+    }
+
+    Ok(())
 }
 
 pub fn parse_document_to_markdown(bytes: &[u8], mime_type: &str) -> Result<String> {
@@ -89,6 +115,8 @@ fn deterministic_text_to_markdown(bytes: &[u8]) -> Result<String> {
     Ok(format!("{normalized}\n"))
 }
 
+/// Heuristic heading detection is intentionally aggressive and treats short
+/// uppercase lines as headings; see KNOWN_LIMITATIONS.md for tradeoffs.
 fn looks_like_heading(line: &str) -> bool {
     let letters = line.chars().filter(|ch| ch.is_alphabetic()).count();
     letters > 3 && line.len() <= 96 && line == line.to_uppercase()
@@ -137,5 +165,18 @@ mod tests {
 
         assert!(output.markdown.starts_with("# ARCHITECTURE"));
         assert_eq!(bus.0, 1);
+    }
+
+    #[test]
+    // spec: doc-parser-ssrf-protection
+    fn rejects_non_wormhole_tunnel_hosts() {
+        for tunnel_host in [
+            "https://attacker.internal",
+            "http://169.254.169.254/latest/meta-data",
+            "file:///etc/passwd",
+        ] {
+            let error = validate_tunnel_host(tunnel_host).unwrap_err();
+            assert!(error.to_string().contains("InvalidTunnelEndpoint"));
+        }
     }
 }

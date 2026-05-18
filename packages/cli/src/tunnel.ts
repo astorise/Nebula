@@ -1,7 +1,5 @@
-import { createRequire } from "node:module";
+import type { Wormhole } from "@tachyon-mesh/wormhole";
 import type { TachyonRouter } from "./tachyon";
-
-const requireFromHere = createRequire(__filename);
 
 export interface WormholeTunnel {
   host: string;
@@ -9,45 +7,55 @@ export interface WormholeTunnel {
 }
 
 export interface WormholeTunnelOptions {
-  localHost: string;
   localPort: number;
   router: TachyonRouter;
-  tenantId?: string;
-  sessionToken?: string;
+  relay: string;
+  sni?: string;
 }
 
-type WormholeClientModule = {
-  connect?: (options: Record<string, unknown>) => Promise<WormholeTunnel> | WormholeTunnel;
-  createTunnel?: (options: Record<string, unknown>) => Promise<WormholeTunnel> | WormholeTunnel;
-  startTunnel?: (options: Record<string, unknown>) => Promise<WormholeTunnel> | WormholeTunnel;
-};
-
 export async function startWormholeTunnel(options: WormholeTunnelOptions): Promise<WormholeTunnel> {
-  const wormhole = loadWormholeClient();
-  const connect = wormhole.connect ?? wormhole.createTunnel ?? wormhole.startTunnel;
-  if (!connect) {
-    throw new Error("wormhole-tunnel does not expose connect/createTunnel/startTunnel");
-  }
-
-  const tunnel = await connect({
-    localHost: options.localHost,
-    localPort: options.localPort,
-    tenantId: options.tenantId,
-    sessionToken: options.sessionToken
+  const WormholeClient = await loadWormholeClient();
+  const tunnel: Wormhole = await WormholeClient.create({
+    relay: options.relay,
+    sni: options.sni,
+    targets: [
+      {
+        protocol: "tcp",
+        publicPort: 443,
+        localPort: options.localPort
+      }
+    ]
   });
+  const host = ingressUrlFromEndpoint(tunnel.endpoint, options.relay);
 
-  publishTunnelStatus(options.router, "connected", tunnel.host);
+  publishTunnelStatus(options.router, "connected", host);
   return {
-    host: tunnel.host,
+    host,
     close: async () => {
       await tunnel.close();
-      publishTunnelStatus(options.router, "disconnected", tunnel.host);
+      publishTunnelStatus(options.router, "disconnected", host);
     }
   };
 }
 
-export function fallbackTunnelHost(tenantId = "default"): string {
-  return `https://webdav.tenant-${tenantId}.wormhole.internal`;
+async function loadWormholeClient(): Promise<typeof import("@tachyon-mesh/wormhole").Wormhole> {
+  const dynamicImport = new Function("specifier", "return import(specifier)") as <T>(specifier: string) => Promise<T>;
+  const module = await dynamicImport<typeof import("@tachyon-mesh/wormhole")>("@tachyon-mesh/wormhole");
+  return module.Wormhole;
+}
+
+export function ingressUrlFromEndpoint(endpoint: string, relay: string): string {
+  const source = endpoint.startsWith("wormhole://") ? endpoint.replace("wormhole://", "https://") : endpoint;
+  const parsed = new URL(source.includes("://") ? source : `https://${source}`);
+  const relayHost = parseHost(relay);
+  if (!parsed.hostname.endsWith(".wormhole.internal") && relayHost.endsWith(".wormhole.internal")) {
+    return `https://${relayHost}`;
+  }
+  return `https://${parsed.hostname}`;
+}
+
+function parseHost(value: string): string {
+  return new URL(value.includes("://") ? value : `https://${value}`).hostname;
 }
 
 export function publishTunnelStatus(router: TachyonRouter, status: "connected" | "disconnected" | "error", host?: string): void {
@@ -58,8 +66,4 @@ export function publishTunnelStatus(router: TachyonRouter, status: "connected" |
       payload: { status, host }
     }
   });
-}
-
-function loadWormholeClient(): WormholeClientModule {
-  return requireFromHere("wormhole-tunnel") as WormholeClientModule;
 }

@@ -18,7 +18,7 @@ export function attachWebSocketBridge(server: HttpsServer, router: TachyonRouter
     socket.on("close", unsubscribe);
     socket.on("message", async (raw) => {
       try {
-        const message = JSON.parse(raw.toString()) as TachyonMessage;
+        const message = parseTachyonMessage(raw.toString());
         const response = await router.route(message);
         sendJson(socket, response);
       } catch (error) {
@@ -33,6 +33,39 @@ export function attachWebSocketBridge(server: HttpsServer, router: TachyonRouter
   });
 
   return wss;
+}
+
+export function parseTachyonMessage(raw: string): TachyonMessage {
+  const parsed = JSON.parse(raw) as unknown;
+  if (!isTachyonMessage(parsed)) {
+    throw new Error("Invalid Tachyon message structure");
+  }
+  return parsed;
+}
+
+export function isTachyonMessage(value: unknown): value is TachyonMessage {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.type !== "string" || candidate.type.length === 0) {
+    return false;
+  }
+
+  if ("requestId" in candidate && typeof candidate.requestId !== "string") {
+    return false;
+  }
+
+  if ("action" in candidate && typeof candidate.action !== "string") {
+    return false;
+  }
+
+  return true;
+}
+
+export function isAuthorizedWebSocketClient(socket: TLSSocket): boolean {
+  return isAuthorizedClient(socket);
 }
 
 function sendJson(socket: WebSocket, message: TachyonMessage): void {

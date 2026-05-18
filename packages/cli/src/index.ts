@@ -3,7 +3,7 @@ import https from "node:https";
 import { loadConfig } from "./config";
 import { loadTlsOptions } from "./security";
 import { StubTachyonRouter } from "./tachyon";
-import { fallbackTunnelHost, publishTunnelStatus, startWormholeTunnel, type WormholeTunnel } from "./tunnel";
+import { startWormholeTunnel, type WormholeTunnel } from "./tunnel";
 import { handleWebDav, watchWebDavRoot } from "./webdav";
 import { attachWebSocketBridge } from "./websocket";
 
@@ -22,26 +22,22 @@ export async function startNebulaCli(): Promise<https.Server> {
     server.listen(config.port, config.host, resolve);
   });
 
-  let tunnel: WormholeTunnel | undefined;
-  let tunnelHost = fallbackTunnelHost(process.env.NEBULA_TENANT_ID);
-  try {
-    tunnel = await startWormholeTunnel({
-      localHost: config.host,
-      localPort: config.port,
-      router,
-      tenantId: process.env.NEBULA_TENANT_ID,
-      sessionToken: process.env.NEBULA_SESSION_TOKEN
-    });
-    tunnelHost = tunnel.host;
-  } catch (error) {
-    publishTunnelStatus(router, "error", tunnelHost);
-    console.warn(error instanceof Error ? error.message : "Unable to start Wormhole tunnel");
+  const relay = process.env.NEBULA_WORMHOLE_RELAY;
+  if (!relay) {
+    throw new Error("NEBULA_WORMHOLE_RELAY is required to start the Wormhole tunnel");
   }
 
-  const watcher = watchWebDavRoot(config.docsRoot, router, tunnelHost);
+  const tunnel: WormholeTunnel = await startWormholeTunnel({
+    localPort: config.port,
+    router,
+    relay,
+    sni: process.env.NEBULA_WORMHOLE_SNI
+  });
+
+  const watcher = watchWebDavRoot(config.docsRoot, router, tunnel.host);
   server.on("close", () => {
     watcher.close();
-    void tunnel?.close();
+    void tunnel.close();
   });
 
   console.log(`Nebula CLI listening on https://${config.host}:${config.port}`);
