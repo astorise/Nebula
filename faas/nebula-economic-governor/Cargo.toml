@@ -15,3 +15,6 @@ tiktoken-rs.workspace = true
 nebula-semantic-deduplicator = { path = "../nebula-semantic-deduplicator" }
 nebula-teacher-arbitrator = { path = "../nebula-teacher-arbitrator" }
 nebula-dataset-forge = { path = "../nebula-dataset-forge" }
+
+[lints]
+workspace = true

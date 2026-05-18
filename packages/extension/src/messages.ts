@@ -119,6 +119,11 @@ export interface FinOpsState {
   deduplicatedRequests: number;
 }
 
+export interface WormholeState {
+  status: "connected" | "disconnected" | "error";
+  host?: string;
+}
+
 export interface DashboardState {
   connectionStatus: string;
   dataset: DatasetState;
@@ -135,6 +140,7 @@ export interface DashboardState {
   finops: FinOpsState;
   drift: DriftState;
   federation: FederationState;
+  wormhole: WormholeState;
   logs: string[];
 }
 

@@ -1,4 +1,6 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 use anyhow::Result;
+use nebula_tenant_core::TenantId;
 use serde::{Deserialize, Serialize};
 
 pub const GOLDEN_VECTOR_NAMESPACE: &str = "golden_dataset";
@@ -7,7 +9,7 @@ pub const GOLDEN_VECTOR_NAMESPACE: &str = "golden_dataset";
 pub struct CandidateRow {
     pub prompt: String,
     pub answer: String,
-    pub tenant_id: String,
+    pub tenant_id: TenantId,
     pub days_in_production: u32,
     pub rollback_count: u32,
     pub drift_count: u32,
@@ -17,7 +19,7 @@ pub struct CandidateRow {
 pub struct GoldenRow {
     pub prompt: String,
     pub answer: String,
-    pub tenant_id: String,
+    pub tenant_id: TenantId,
     pub locked: bool,
     pub vector_namespace: String,
 }
@@ -87,7 +89,7 @@ mod tests {
             CandidateRow {
                 prompt: "p".into(),
                 answer: "a".into(),
-                tenant_id: "acme".into(),
+                tenant_id: nebula_tenant_core::deterministic_test_tenant("acme"),
                 days_in_production: 8,
                 rollback_count: 0,
                 drift_count: 0,

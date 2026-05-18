@@ -25,7 +25,8 @@ members = [
   "nebula-wasm-foundry",
   "nebula-tenant-core",
   "nebula-semantic-deduplicator",
-  "nebula-economic-governor"
+  "nebula-economic-governor",
+  "adapters/nebula-redis-budget-store"
 ]
 resolver = "2"
 
@@ -43,8 +44,13 @@ sha2 = "0.10"
 uuid = { version = "1.8", features = ["serde", "v5"] }
 ts-rs = "10.0"
 tiktoken-rs = "0.11"
+redis = { version = "0.27", features = ["tokio-comp"] }
 prost = "0.13"
 tokio = { version = "1.41", features = ["macros", "net", "rt-multi-thread", "signal"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 tonic = "0.12"
 tree-sitter = "0.22"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"

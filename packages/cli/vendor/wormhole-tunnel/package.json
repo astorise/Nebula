@@ -1,0 +1,12 @@
+{
+  "name": "wormhole-tunnel",
+  "version": "0.0.0-nebula",
+  "private": true,
+  "type": "commonjs",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/astorise/Wormhole.git",
+    "directory": "cli"
+  }
+}

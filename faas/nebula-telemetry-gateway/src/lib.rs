@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 use anyhow::{anyhow, Result};
 use prost::Message;
 use serde::{Deserialize, Serialize};

@@ -1,0 +1,16 @@
+[package]
+name = "nebula-redis-budget-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+nebula-economic-governor = { path = "../../nebula-economic-governor" }
+nebula-tenant-core = { path = "../../nebula-tenant-core" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+redis.workspace = true
+
+[lints]
+workspace = true

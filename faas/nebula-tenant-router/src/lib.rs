@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 use anyhow::Result;
 use nebula_tenant_core::{deterministic_test_tenant, resolve_tenant, TenantId, TenantRegistry};
 use serde::{Deserialize, Serialize};

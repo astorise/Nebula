@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 use anyhow::Result;
 use nebula_dataset_forge::{
     append_example, dataset_index_key, CounterStore, DatasetCounters, EventBus as DatasetEventBus,

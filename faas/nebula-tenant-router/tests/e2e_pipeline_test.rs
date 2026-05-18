@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 use anyhow::Result;
 use nebula_dataset_forge::{
     mix_with_golden, ExampleSource, GoldenTrainingRow, ReplayConfig, TrainingExample,
@@ -62,7 +63,7 @@ fn routes_registered_payload_into_golden_replay_batch() {
         CandidateRow {
             prompt: routed.payload.prompt.clone(),
             answer: routed.payload.answer.clone(),
-            tenant_id: routed.tenant_id.to_string(),
+            tenant_id: routed.tenant_id,
             days_in_production: 8,
             rollback_count: 0,
             drift_count: 0,

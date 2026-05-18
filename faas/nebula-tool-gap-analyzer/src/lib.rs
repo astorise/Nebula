@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 use serde::{Deserialize, Serialize};
 
 pub const MISSING_TOOL_TOPIC: &str = "nebula.telemetry.missing_tool";

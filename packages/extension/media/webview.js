@@ -64,6 +64,9 @@
           peers: [],
           contributions: []
         },
+        wormhole: {
+          status: "disconnected"
+        },
         logs: []
       };
       window.addEventListener("message", ({ data }) => {
@@ -115,6 +118,13 @@
         </article>
       </section>
       <section class="grid">
+        <article>
+          <h2>Wormhole</h2>
+          <div class="peer">
+            <span>${escapeHtml(state.wormhole.host ?? "No tunnel host")}</span>
+            <strong class="${state.wormhole.status === "connected" ? "healthy" : state.wormhole.status === "error" ? "rollback" : ""}">${escapeHtml(state.wormhole.status)}</strong>
+          </div>
+        </article>
         <article>
           <h2>Federation</h2>
           <div class="deployHeader">

@@ -1,4 +1,6 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 use anyhow::Result;
+use nebula_tenant_core::TenantId;
 use regex::RegexSet;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -17,7 +19,7 @@ pub struct DpoJudgementRequest {
     pub tier1_answer: String,
     pub tier3_answer: String,
     #[serde(default)]
-    pub tenant_id: Option<String>,
+    pub tenant_id: Option<TenantId>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -26,11 +28,11 @@ pub struct PreferencePair {
     pub chosen: String,
     pub rejected: String,
     #[serde(default)]
-    pub tenant_id: Option<String>,
+    pub tenant_id: Option<TenantId>,
 }
 
 pub trait ConstitutionStore {
-    fn load_rules(&self, tenant_id: Option<&str>) -> Result<Vec<ConstitutionRule>>;
+    fn load_rules(&self, tenant_id: Option<TenantId>) -> Result<Vec<ConstitutionRule>>;
 }
 
 pub trait PreferenceSink {
@@ -54,7 +56,7 @@ pub fn judge_and_forward(
     sink: &mut impl PreferenceSink,
     request: DpoJudgementRequest,
 ) -> Result<PreferencePair> {
-    let rules = store.load_rules(request.tenant_id.as_deref())?;
+    let rules = store.load_rules(request.tenant_id)?;
     let pattern_set = compile_forbidden_patterns(&rules)?;
     if pattern_set.is_match(&request.tier3_answer) {
         anyhow::bail!("chosen answer violates constitution");
@@ -110,7 +112,7 @@ mod tests {
     struct Sink(Vec<PreferencePair>);
 
     impl ConstitutionStore for Store {
-        fn load_rules(&self, _tenant_id: Option<&str>) -> Result<Vec<ConstitutionRule>> {
+        fn load_rules(&self, _tenant_id: Option<TenantId>) -> Result<Vec<ConstitutionRule>> {
             Ok(vec![ConstitutionRule {
                 id: "rust-safety".into(),
                 instruction: "Do not use unwrap in generated Rust.".into(),
@@ -142,7 +144,7 @@ mod tests {
                 prompt: "read a file".into(),
                 tier1_answer: "unwrap()".into(),
                 tier3_answer: "std::fs::read_to_string(path)?".into(),
-                tenant_id: Some("acme".into()),
+                tenant_id: Some(nebula_tenant_core::deterministic_test_tenant("acme")),
             },
         )
         .unwrap();

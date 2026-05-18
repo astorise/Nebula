@@ -16,6 +16,7 @@ export interface FileUpdatedPayload {
   path: string;
   mime_type: string;
   sha256: string;
+  tunnel_host: string;
 }
 
 export async function handleWebDav(req: IncomingMessage, res: ServerResponse, context: WebDavContext): Promise<void> {
@@ -143,7 +144,7 @@ function escapeXml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
 
-export function watchWebDavRoot(docsRoot: string, router: TachyonRouter, debounceMs = 2000): FSWatcher {
+export function watchWebDavRoot(docsRoot: string, router: TachyonRouter, tunnelHost: string, debounceMs = 2000): FSWatcher {
   const timers = new Map<string, NodeJS.Timeout>();
   const watcher = watch(docsRoot, { recursive: true }, (_eventType, filename) => {
     if (!filename) {
@@ -165,7 +166,7 @@ export function watchWebDavRoot(docsRoot: string, router: TachyonRouter, debounc
       absolutePath,
       setTimeout(() => {
         timers.delete(absolutePath);
-        void emitFileUpdated(docsRoot, absolutePath, router);
+        void emitFileUpdated(docsRoot, absolutePath, router, tunnelHost);
       }, debounceMs)
     );
   });
@@ -180,7 +181,7 @@ export function watchWebDavRoot(docsRoot: string, router: TachyonRouter, debounc
   return watcher;
 }
 
-async function emitFileUpdated(docsRoot: string, absolutePath: string, router: TachyonRouter): Promise<void> {
+async function emitFileUpdated(docsRoot: string, absolutePath: string, router: TachyonRouter, tunnelHost: string): Promise<void> {
   try {
     const stat = await fs.stat(absolutePath);
     if (!stat.isFile()) {
@@ -192,7 +193,8 @@ async function emitFileUpdated(docsRoot: string, absolutePath: string, router: T
     const payload: FileUpdatedPayload = {
       path: relativePath,
       mime_type: mimeTypeFor(absolutePath),
-      sha256: crypto.createHash("sha256").update(file).digest("hex")
+      sha256: crypto.createHash("sha256").update(file).digest("hex"),
+      tunnel_host: tunnelHost
     };
 
     router.emitEvent({

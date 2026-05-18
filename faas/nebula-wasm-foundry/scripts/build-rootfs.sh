@@ -10,6 +10,5 @@ cargo
 cargo-component
 wasm32-wasip1
 EOF
-SHA256SUM="$(sha256sum "$MANIFEST" | sed 's/^\\//' | awk '{print $1}')"
-printf 'sha256sum %s\n' "$SHA256SUM" >> "$MANIFEST"
+sha256sum "$MANIFEST" > "$MANIFEST.sha256"
 echo "nebula wasm foundry rootfs prepared at $ROOTFS"

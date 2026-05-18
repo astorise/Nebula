@@ -8,3 +8,7 @@ license.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+nebula-tenant-core = { path = "../nebula-tenant-core" }
+
+[lints]
+workspace = true

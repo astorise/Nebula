@@ -1,3 +1,4 @@
+#![cfg_attr(test, allow(clippy::unwrap_used, clippy::expect_used))]
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -10,6 +11,7 @@ pub struct FileUpdatedEvent {
     pub path: String,
     pub mime_type: String,
     pub sha256: String,
+    pub tunnel_host: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -21,7 +23,7 @@ pub struct MarkdownReadyEvent {
 }
 
 pub trait WebDavClient {
-    fn fetch(&mut self, path: &str) -> Result<Vec<u8>>;
+    fn fetch(&mut self, tunnel_host: &str, path: &str) -> Result<Vec<u8>>;
 }
 
 pub trait EventBus {
@@ -33,7 +35,7 @@ pub fn ingest_file(
     bus: &mut impl EventBus,
     event: FileUpdatedEvent,
 ) -> Result<MarkdownReadyEvent> {
-    let bytes = client.fetch(&event.path)?;
+    let bytes = client.fetch(&event.tunnel_host, &event.path)?;
     let markdown = parse_document_to_markdown(&bytes, &event.mime_type)?;
     let output = MarkdownReadyEvent {
         source_path: event.path,
@@ -104,7 +106,7 @@ mod tests {
     struct Bus(usize);
 
     impl WebDavClient for Client {
-        fn fetch(&mut self, _path: &str) -> Result<Vec<u8>> {
+        fn fetch(&mut self, _tunnel_host: &str, _path: &str) -> Result<Vec<u8>> {
             Ok(self.0.clone())
         }
     }
@@ -128,6 +130,7 @@ mod tests {
                 path: "/docs/a.txt".into(),
                 mime_type: "text/plain".into(),
                 sha256: "source".into(),
+                tunnel_host: "https://webdav.tenant-acme.wormhole.internal".into(),
             },
         )
         .unwrap();

@@ -11,3 +11,6 @@ serde_json.workspace = true
 sha2.workspace = true
 uuid.workspace = true
 nebula-tenant-core = { path = "../nebula-tenant-core" }
+
+[lints]
+workspace = true

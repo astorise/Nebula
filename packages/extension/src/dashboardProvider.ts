@@ -69,6 +69,9 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       peers: [],
       contributions: []
     },
+    wormhole: {
+      status: "disconnected"
+    },
     logs: []
   };
 
@@ -455,6 +458,16 @@ export class NebulaDashboardProvider implements vscode.Disposable {
       const payload = envelope.payload as Partial<{ totalTokens: number; total_tokens: number; costUsd: number; cost_usd: number }>;
       this.state.finops.tokensUsed += payload.totalTokens ?? payload.total_tokens ?? 0;
       this.state.finops.dailyCostUsd += payload.costUsd ?? payload.cost_usd ?? 0;
+      this.postState();
+      return;
+    }
+
+    if (envelope.action === "nebula.wormhole.status") {
+      const payload = envelope.payload as Partial<{ status: "connected" | "disconnected" | "error"; host: string }>;
+      this.state.wormhole = {
+        status: payload.status ?? "disconnected",
+        host: payload.host
+      };
       this.postState();
       return;
     }

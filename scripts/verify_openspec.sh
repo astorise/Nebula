@@ -8,16 +8,18 @@ mapfile -t rust_tests < <(
   find "$FAAS_DIR" \
     -path "$FAAS_DIR/target" -prune -o \
     \( -path "$FAAS_DIR/nebula-*/src/*.rs" -o \
-    -path "$FAAS_DIR/nebula-*/tests/*.rs" \) \
+    -path "$FAAS_DIR/nebula-*/tests/*.rs" -o \
+    -path "$FAAS_DIR/adapters/*/src/*.rs" -o \
+    -path "$FAAS_DIR/adapters/*/tests/*.rs" \) \
     -type f -print |
     sort |
-    xargs grep -Il '#\[test\]'
+    xargs grep -EIl '#\[(tokio::test|test|rstest|test_case)\]'
 )
 
 missing_annotations=()
 for test_file in "${rust_tests[@]}"; do
   if ! awk '
-    /#\[test\]/ {
+    /#\[(tokio::test|test|rstest|test_case)\]/ {
       getline next_line
       if (next_line !~ /^[[:space:]]*\/\/ spec: [a-z0-9][a-z0-9-]*(#[a-z0-9][a-z0-9-]*)?/) {
         missing = 1
